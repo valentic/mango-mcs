@@ -88,7 +88,9 @@ make -C $PROJECT_DIR BR2_EXTERNAL=${EXTERNAL_DIR} $DEFCONFIG
 
 echo
 echo "-------------------------------------------------------------------"
-echo "Ready to build. Run make in the project directory:"
+echo "Ready to build.  Add non-versioned items to the secrets directory."
+echo
+echo "Run make in the project directory:"
 echo
 echo "    cd $PROJECT_DIR"
 echo "    make"
