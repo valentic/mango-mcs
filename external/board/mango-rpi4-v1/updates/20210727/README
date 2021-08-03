@@ -1,0 +1,11 @@
+==========================================================================
+20210727  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Fixed camera mapping issue in mango/monitor/cameras/manager.py 
+    - Added remap-cameras command
+    - Reduce the default cameras cool down time to 3-minutes
+    - Update to release 1.3
+

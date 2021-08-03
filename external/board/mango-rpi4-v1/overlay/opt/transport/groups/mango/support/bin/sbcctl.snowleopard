@@ -1,0 +1,219 @@
+#!/usr/bin/env python2
+
+#####################################################################
+#
+#   SBC control 
+#
+#   Need to remain compatible with TS7260 version.
+#
+#   status
+#
+#       [power]
+#       usb: 1
+#       iridium: 1
+#
+#   2016-07-13  Todd Valentic
+#               Initial version
+#
+#   2017-05-22  Todd Valentic
+#               Add nogpio option for system without GPIO board
+#
+#####################################################################
+
+import serial
+import optparse
+import sys
+import logging
+import collections
+import datetime
+import pytz
+
+VERSION=1
+
+DeviceToPin = {
+    'fan':      0,
+    'lna':      1,
+    'ettus':    2,
+    'ssd':      3,
+    'iridium':  4
+    }
+
+PinToDevice = {pin:name for (name,pin) in DeviceToPin.items()}
+
+class Command:
+    
+    def __init__(self,name,callback,numOptions,usage,desc):
+        self.name       = name
+        self.callback   = callback
+        self.numOptions = numOptions
+        self.usage      = usage
+        self.desc       = desc
+
+class Processor:
+    
+    def __init__(self):
+        self.defineCommands()
+
+    def setOptions(self,options):
+        self.options = options
+
+    def defineCommands(self):
+
+        self.commands = collections.OrderedDict() 
+
+        self.addCommand('status',self.onStatus,0,'','DIO and device status')
+        self.addCommand('gpio',self.onGPIO,2,'<pin> <dir>','Set pin in/out')
+        self.addCommand('setpin',self.onSetPin,2,'<pin> <state>','Set pin state')
+        self.addCommand('reset',self.onReset,0,'','Set pins to output and low')
+        self.addCommand('device',self.onDevice,2,'<device> <state>','Set device power state')
+
+    def addCommand(self,*pos):
+        name = pos[0] 
+        self.commands[name] = Command(*pos) 
+
+    def getUsage(self):
+        usage = [] 
+        
+        usage.append('')
+        usage.append('')
+
+        for name,command in self.commands.items():
+            line = '%10s %-20s %s' % (name,command.usage,command.desc)
+            usage.append(line)
+
+        usage.append('')
+        usage.append('<device> - '+' '.join(DeviceToPin.keys()))
+        usage.append('<dir>    - in or out')
+        usage.append('<state>  - 0|off or 1|on')
+
+        return '\n'.join(usage)
+
+    def gpioCommand(self,cmd):
+
+        if not self.options.hasgpio:
+            return '0'
+
+        port = serial.Serial(self.options.device,19200,timeout=1)
+
+        port.write(cmd+'\r')
+        result = port.read(25).split('\n\r')
+
+        if self.options.verbose:
+            print cmd,result
+
+        port.close()
+
+        if len(result)==3:
+            return result[1:-1][0]
+        else:
+            return result[-1]
+
+    def run(self,args):
+
+        try:
+            command = self.commands[args[0]]
+        except:
+            print 'Unknown command: %s' % args[0]
+            return 1 
+
+        if len(args)<command.numOptions:
+            print 'Too few options'
+            return 2
+
+        try:
+            return command.callback(args)
+        except:
+            logging.exception('Problem running command')
+            return 3
+
+    def onStatus(self,args):
+
+        timestamp = datetime.datetime.utcnow()
+        timestamp = timestamp.replace(tzinfo=pytz.utc,microsecond=0)
+
+        pins = int(self.gpioCommand('gpio readall'),16)
+        
+        print '[metadata]'
+        print 'version: %s' % VERSION
+        print 'timestamp: %s' % timestamp
+
+        print '[GPIO]'
+        for bit in range(8):
+            print 'Pin %d: %d' % (bit,bool(pins & 1<<bit))
+
+        print '[Device]'
+        for pin in range(8):
+            try:
+                device = PinToDevice[pin]
+            except:
+                continue
+
+            print '%s: %d' % (device,bool(pins & 1<<pin))
+        
+        return 0
+
+    def onReset(self,args):
+        self.gpioCommand('gpio iomask ff')
+        self.gpioCommand('gpio iodir 00')
+        self.gpioCommand('gpio writeall 00')
+        return 0
+
+    def onGPIO(self,args):
+        self.gpioCommand(' '.join(args[1:]))
+        return 0
+
+    def onSetPin(self,args):
+        
+        pin = int(args[1])
+        state = args[2]
+
+        if state in ['0','off']:
+            self.gpioCommand('gpio clear %d' % pin)
+        elif state in ['1','on']:
+            self.gpioCommand('gpio set %d' % pin)
+        else:
+            print 'Unknown state: %s' % state
+            return 1
+
+        return 0
+
+    def onDevice(self,args):
+
+        name = args[1]
+        state = args[2]
+
+        try:    
+            pin = DeviceToPin[name]
+        except: 
+            print 'Unknown device: %s' % name
+            return 1
+
+        return self.onSetPin(['gpio',pin,state])
+
+if __name__ == '__main__':
+
+    processor = Processor()
+
+    parser = optparse.OptionParser(usage=processor.getUsage())
+
+    parser.add_option('-d','--device',dest='device',
+                    help='GPIO serial device (default is /dev/ttyACM0)',default='/dev/ttyACM0')
+
+    parser.add_option('-n','--nogpio',dest='hasgpio',action='store_false',
+                    help='No GPIO device',default=True)
+
+    parser.add_option('-v','--verbose',dest='verbose',action='store_true',
+                    help='Verbose debugging output',default=False)
+
+    (options,args) = parser.parse_args()
+
+    if not args:
+        parser.print_help()
+        sys.exit(0)
+
+    processor.setOptions(options)
+
+    resultCode = processor.run(args)
+
+    sys.exit(resultCode)
+

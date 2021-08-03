@@ -1,0 +1,16 @@
+==========================================================================
+Patches for apcupsd
+==========================================================================
+
+2021-07-21  Todd Valentic
+            Initial implementation
+
+--------------------------------------------------------------------------
+00_sysconfdir.patch
+--------------------------------------------------------------------------
+
+Sets sysconfdir to be /etc/apcupsd instead of /etc. The package drops a 
+lot of files there with rather generic names, so this helps to isolate
+them into a logical place. It matches the layout in RHEL and Fedora 
+packaging.
+

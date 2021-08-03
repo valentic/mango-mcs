@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+
+##########################################################################
+#
+#   Device control 
+#
+#   2018-06-08  Todd Valentic
+#               Initial implementation
+#
+##########################################################################
+
+import sys
+import argparse
+import directory
+
+#-------------------------------------------------------------------------
+# Command Processors 
+#-------------------------------------------------------------------------
+
+def ProcessControl(pductl,args):
+    
+    for pdu_id,pdu in pductl.list().items():
+        for id,rail in pdu['rails'].items():
+            if args.device==rail['device']:
+                pductl.cmd(pdu_id,'SP',id,args.state)
+                return True 
+    
+    return True
+
+def ProcessStatus(pductl,args):
+    pdus = pductl.list()
+    
+    for pdu_id in sorted(pdus):
+        status = pductl.status(pdu_id)
+        pdu = pdus[pdu_id] 
+        for rail_id in sorted(pdu['rails']):
+            rail = pdu['rails'][rail_id]
+            if rail['device']:
+                state = status['RS'][int(rail_id)-1]
+                print '%s - rail %s: %s' % (pdu_id,rail_id,state)
+
+    return True
+
+def ProcessList(pductl,args):
+    widthDevice = 0
+    widthLabel  = 0
+
+    pdus = pductl.list()
+
+    for pdu_id,pdu in pdus.items():
+        for rail_id,rail in pdu['rails'].items():
+            if rail['device']:
+                widthDevice = max(widthDevice,len(rail['device']))
+                widthLabel  = max(widthLabel ,len(rail['label']))
+
+    for pdu_id in sorted(pdus):
+        pdu = pdus[pdu_id]
+        for rail_id in sorted(pdu['rails']):
+            rail = pdu['rails'][rail_id]
+            if rail['device']:
+                fmt = '%%%ds - %%-%ds - %%s' % (widthDevice,widthLabel)
+                print fmt % (rail['device'],rail['label'],pdu_id)
+
+#-------------------------------------------------------------------------
+# Command Maps
+#-------------------------------------------------------------------------
+
+Commands = {
+    'set':      ProcessControl,
+    'status':   ProcessStatus, 
+    'list':     ProcessList,
+    }
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description="Device Control")
+    subparsers = parser.add_subparsers(dest='command')
+
+    control_parser = subparsers.add_parser('set')
+    control_parser.add_argument('device')
+    control_parser.add_argument('state',choices=['on','off'])
+
+    list_parser = subparsers.add_parser('list')
+
+    status_parser = subparsers.add_parser('status')
+
+    parser.add_argument('-v','--verbose',action='store_true',
+                    help='Verbose output')
+
+    # - Process ----------------------------------------------------------
+
+    args = parser.parse_args()
+
+    pductl = directory.Directory().connect('pductl')
+
+    result = Commands[args.command](pductl,args)
+
+    if result:
+        sys.exit(0)
+    else:   
+        sys.exit(1)
+
+

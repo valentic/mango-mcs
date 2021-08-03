@@ -1,0 +1,243 @@
+#!/usr/bin/env python2
+
+##########################################################################
+#
+#   PDUv2 Command Line Control
+#
+#   2018-05-31  Todd Valentic
+#               Initial implementation
+#
+#   2018-08-20  Todd Valentic
+#               Add heater setup (ST)
+#
+#   2019-07-25  Todd Valentic
+#               Add VER and UP
+#
+##########################################################################
+
+import sys
+import argparse
+from pdulib import PDU
+
+#-------------------------------------------------------------------------
+# Display Helpers 
+#-------------------------------------------------------------------------
+
+def PrintRBME(data):
+    print '[RBME]'
+    print 'Temperature: %.1f C' % data[0]
+    print 'Pressure   : %.1f mb' % data[1]
+    print 'Altitude   : %.1f m' % data[2]
+    print 'Humidity   : %.1f %%' % data[3]
+
+def PrintRH(data):
+    print '[RH]'
+    for index,state in enumerate(data):
+        print 'Heater %d: %s' % (index+1,['Off','On'][state])
+
+def PrintRP(data):
+    print '[RP]'
+    for index,state in enumerate(data):
+        print 'Port %2d: %s' % (index+1,['Off','On'][state])
+
+def PrintRS(data):
+    print '[RS]'
+    for index,state in enumerate(data):
+        print 'Port %2d: %s' % (index+1,['Off','On'][state])
+
+def PrintRT(data):
+    print '[RT]'
+    for index,temp in enumerate(data):
+        print 'Probe %2d: %5.1f C' % (index+1,temp)
+
+def PrintRLTC(data):
+    print '[RLTC]'
+    volts = data['volts']
+    amps = data['amps']
+    for index in range(len(amps)):
+        print 'Port %2d: %4.1f V  %6.3f A' % (index+1,volts[index],amps[index])
+
+#-------------------------------------------------------------------------
+# Command Processors 
+#-------------------------------------------------------------------------
+
+def ProcessLD(pdu,args):
+    print pdu.LD(args.state)
+    return True
+
+def ProcessSA(pdu,args):
+    print pdu.SA(args.state)
+    return True
+
+def ProcessSP(pdu,args):
+    print pdu.SP(args.fet,args.state)
+    return True
+
+def ProcessST(pdu,args):
+    print pdu.ST(args.channel,args.low,args.high,args.zone)
+    return True
+
+def ProcessRTS(pdu,args):
+    print pdu.RTS()
+    return True
+
+def ProcessRBME(pdu,args):
+    data = pdu.RBME()
+
+    if args.verbose: 
+        PrintRMBE(data)
+    else:
+        print data
+
+    return True
+
+def ProcessRH(pdu,args):
+    data = pdu.RH()
+
+    if args.verbose:
+        PrintRH(data)
+    else:
+        print data
+
+    return True
+
+def ProcessRP(pdu,args):
+    data = pdu.RP()
+
+    if args.verbose:
+        PrintRP(data)
+    else:
+        print data
+
+    return True
+
+def ProcessRS(pdu,args):
+    data = pdu.RS()
+
+    if args.verbose:
+        PrintRS(data)
+    else:
+        print data
+
+    return True
+
+
+def ProcessRT(pdu,args):
+    data = pdu.RT() 
+
+    if args.verbose:
+        PrintRT(data)
+    else:
+        print data
+
+    return True
+
+def ProcessRLTC(pdu,args):
+    data = pdu.RLTC()
+
+    if args.verbose:
+        PrintRLTC(data)
+    else:
+        print data
+
+    return True
+
+def ProcessVER(pdu,args):
+    print pdu.VER()
+    return True
+
+def ProcessUP(pdu,args):
+    print pdu.UP()
+    return True
+
+def ProcessStatus(pdu,args):
+    data = pdu.status()
+
+    if args.verbose:
+        PrintRH(data['RH'])
+        PrintRP(data['RP'])
+        PrintRS(data['RS'])
+        PrintRT(data['RT'])
+        PrintRLTC(data['RLTC'])
+        PrintRBME(data['RBME'])
+    else:
+        print data 
+
+    return True
+
+#-------------------------------------------------------------------------
+# Command Maps
+#-------------------------------------------------------------------------
+
+Commands = {
+    'LD':       ProcessLD,
+    'SA':       ProcessSA,
+    'SP':       ProcessSP,
+    'ST':       ProcessST,
+    'RTS':      ProcessRTS,
+    'RBME':     ProcessRBME,
+    'RH':       ProcessRH,
+    'RP':       ProcessRP,
+    'RS':       ProcessRS,
+    'RT':       ProcessRT,
+    'RLTC':     ProcessRLTC,
+    'UP':       ProcessUP,
+    'VER':      ProcessVER,
+    'status':   ProcessStatus, 
+    }
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description="PDUv2 Control")
+    subparsers = parser.add_subparsers(dest='command')
+
+    ld_parser = subparsers.add_parser('LD')
+    ld_parser.add_argument('state',choices=['on','off'])
+
+    sa_parser = subparsers.add_parser('SA')
+    sa_parser.add_argument('state',choices=['on','off'])
+
+    sp_parser = subparsers.add_parser('SP')
+    sp_parser.add_argument('fet',type=int)
+    sp_parser.add_argument('state',choices=['on','off'])
+
+    st_parser = subparsers.add_parser('ST')
+    st_parser.add_argument('channel',type=int)
+    st_parser.add_argument('low',type=float)
+    st_parser.add_argument('high',type=float)
+    st_parser.add_argument('zone',type=int)
+
+    rh_parser = subparsers.add_parser('RTS')
+    rh_parser = subparsers.add_parser('RBME')
+    rh_parser = subparsers.add_parser('RH')
+    rp_parser = subparsers.add_parser('RP')
+    rp_parser = subparsers.add_parser('RS')
+    rt_parser = subparsers.add_parser('RT')
+    rtlc_parser = subparsers.add_parser('RLTC')
+    ver_parser = subparsers.add_parser('VER')
+    up_parser = subparsers.add_parser('UP')
+
+    status_parser = subparsers.add_parser('status')
+
+    parser.add_argument('-a','--addr',default='10.51.10.81:8880',
+                    help='PDUv2 address (default %(default)s)')
+
+    parser.add_argument('-m','--model',default='v2',
+                    choices=['sp','v2'],
+                    help='Model (default %(default)s)')
+
+    parser.add_argument('-v','--verbose',action='store_true',
+                    help='Verbose output')
+
+    # - Process ----------------------------------------------------------
+
+    args = parser.parse_args()
+
+    with PDU(model=args.model,addr=args.addr) as pdu:
+        result = Commands[args.command](pdu,args)
+
+    if result:
+        sys.exit(0)
+    else:   
+        sys.exit(1)
+

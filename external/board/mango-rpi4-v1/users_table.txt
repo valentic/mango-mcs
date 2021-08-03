@@ -1,0 +1,1 @@
+ops -1 ops -1 $5$rkcmpzAuPvI/lH3o$C8fjGZAWIZDHU9DjsXKYQCt5RA3UltQlAZL5ZqUTCs7 /home/ops /bin/bash wheel,dialout,transport,video

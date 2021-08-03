@@ -1,0 +1,196 @@
+From buildroot  Sat Sep 15 19:01:19 2018
+From: Fabrice Fontaine <fontaine.fabrice () gmail ! com>
+Date: Sat, 15 Sep 2018 19:01:19 +0000
+To: buildroot
+Subject: [Buildroot] [PATCH 1/1] nfs-utils: bump to version 2.3.3
+Message-Id: <20180915190119.18189-1-fontaine.fabrice () gmail ! com>
+X-MARC-Message: https://marc.info/?l=buildroot&m=153703810013005
+
+- Remove fifth patch (already in version)
+- Add a new patch from gentoo to remove Werror
+- Add a new patch to fix internal rpcgen
+- Fix major/minor build failure with glibc 2.28, see
+  http://git.linux-nfs.org/?p=steved/nfs-utils.git;a=commit;h=4ac4b4f74dcec30dcb23aab827eed152db08daea
+- Add hash for license file
+
+Fixes:
+ - http://autobuild.buildroot.org/results/c559c4b7b23d1fa634a1b3ae05a6afdb672e4e79
+
+Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+---
+ .../0005-nfs-utils-2.3.2-no-werror.patch      | 56 +++++++++++++++++++
+ ...tils-add-missing-include-of-stdint.h.patch | 33 -----------
+ ...06-fix-usage-of-with-rpcgen-internal.patch | 34 +++++++++++
+ package/nfs-utils/nfs-utils.hash              |  5 +-
+ package/nfs-utils/nfs-utils.mk                |  2 +-
+ 5 files changed, 94 insertions(+), 36 deletions(-)
+ create mode 100644 package/nfs-utils/0005-nfs-utils-2.3.2-no-werror.patch
+ delete mode 100644 package/nfs-utils/0005-nfs-utils-add-missing-include-of-stdint.h.patch
+ create mode 100644 package/nfs-utils/0006-fix-usage-of-with-rpcgen-internal.patch
+
+diff --git a/package/nfs-utils/0005-nfs-utils-2.3.2-no-werror.patch b/package/nfs-utils/0005-nfs-utils-2.3.2-no-werror.patch
+new file mode 100644
+index 0000000000..60cf1d2d08
+--- /dev/null
++++ b/package/nfs-utils/0005-nfs-utils-2.3.2-no-werror.patch
+@@ -0,0 +1,56 @@
++https://bugs.gentoo.org/656984
++
++Don't build with -Werror flags.
++
++Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
++[Retrieved from: https://gitweb.gentoo.org/repo/gentoo.git/plain/net-fs/nfs-utils/files/nfs-utils-2.3.2-no-werror.patch]
++
++--- a/configure.ac
+++++ b/configure.ac
++@@ -544,45 +544,11 @@
++ AC_SUBST(LDFLAGS_FOR_BUILD)
++ 
++ my_am_cflags="\
++- -pipe \
++  -Wall \
++  -Wextra \
++- -Werror=strict-prototypes \
++- -Werror=missing-prototypes \
++- -Werror=missing-declarations \
++- -Werror=format=2 \
++- -Werror=undef \
++- -Werror=missing-include-dirs \
++- -Werror=strict-aliasing=2 \
++- -Werror=init-self \
++- -Werror=implicit-function-declaration \
++- -Werror=return-type \
++- -Werror=switch \
++- -Werror=overflow \
++- -Werror=parentheses \
++- -Werror=aggregate-return \
++- -Werror=unused-result \
++  -fno-strict-aliasing \
++ "
++-
++-AC_DEFUN([CHECK_CCSUPPORT], [
++-  my_save_cflags="$CFLAGS"
++-  CFLAGS=$1
++-  AC_MSG_CHECKING([whether CC supports $1])
++-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
++-    [AC_MSG_RESULT([yes])]
++-    [$2+=$1],
++-    [AC_MSG_RESULT([no])]
++-  )
++-  CFLAGS="$my_save_cflags"
++-])
++-
++-CHECK_CCSUPPORT([-Werror=format-overflow=2], [flg1])
++-CHECK_CCSUPPORT([-Werror=int-conversion], [flg2])
++-CHECK_CCSUPPORT([-Werror=incompatible-pointer-types], [flg3])
++-CHECK_CCSUPPORT([-Werror=misleading-indentation], [flg4])
++-
++-AC_SUBST([AM_CFLAGS], ["$my_am_cflags $flg1 $flg2 $flg3 $flg4"])
+++AC_SUBST([AM_CFLAGS], ["$my_am_cflags"])
++ 
++ # Make sure that $ACLOCAL_FLAGS are used during a rebuild
++ AC_SUBST([ACLOCAL_AMFLAGS], ["-I $ac_macro_dir \$(ACLOCAL_FLAGS)"])
+diff --git a/package/nfs-utils/0005-nfs-utils-add-missing-include-of-stdint.h.patch b/package/nfs-utils/0005-nfs-utils-add-missing-include-of-stdint.h.patch
+deleted file mode 100644
+index a6214350ca..0000000000
+--- a/package/nfs-utils/0005-nfs-utils-add-missing-include-of-stdint.h.patch
++++ /dev/null
+@@ -1,33 +0,0 @@
+-From b3ff26fa182b34b6faa1317f18a9dac4c7963334 Mon Sep 17 00:00:00 2001
+-From: Matt Weber <matthew.weber@rockwellcollins.com>
+-Date: Mon, 2 Oct 2017 09:57:15 -0500
+-Subject: [PATCH] nfs-utils: add missing include of stdint.h
+-
+-Glibc bump to 2.26 exposed this missing header when building
+-with the following combination using an i386 internal toolchain.
+-gcc5.4.0
+-bin2.28.1
+-linux4.1.43
+-
+-Upstream: https://bugzilla.linux-nfs.org/show_bug.cgi?id=312
+-
+-Signed-off-by: Matthew Weber <matthew.weber@rockwellcollins.com>
+----
+- support/nsm/rpc.c | 1 +
+- 1 file changed, 1 insertion(+)
+-
+-diff --git a/support/nsm/rpc.c b/support/nsm/rpc.c
+-index 4e5f40e..d91c6ea 100644
+---- a/support/nsm/rpc.c
+-+++ b/support/nsm/rpc.c
+-@@ -40,6 +40,7 @@
+- 
+- #include <time.h>
+- #include <stdbool.h>
+-+#include <stdint.h>
+- #include <string.h>
+- #include <unistd.h>
+- #include <fcntl.h>
+--- 
+-1.9.1
+-
+diff --git a/package/nfs-utils/0006-fix-usage-of-with-rpcgen-internal.patch b/package/nfs-utils/0006-fix-usage-of-with-rpcgen-internal.patch
+new file mode 100644
+index 0000000000..7e733e0995
+--- /dev/null
++++ b/package/nfs-utils/0006-fix-usage-of-with-rpcgen-internal.patch
+@@ -0,0 +1,34 @@
++From cc9a9b1a724b8da7fb0834824bb0e69ff4611a3c Mon Sep 17 00:00:00 2001
++From: Fabrice Fontaine <fontaine.fabrice@gmail.com>
++Date: Sat, 15 Sep 2018 20:55:12 +0200
++Subject: [PATCH] fix usage of --with-rpcgen=internal
++
++Since commit
++http://git.linux-nfs.org/?p=steved/nfs-utils.git;a=commitdiff;h=fd5ccdc449a0ef79498191aecb3e44120e813618,
++internal rpcgen can't be used anymore since RPCGEN_PATH is set to empty
++and is not updated if rpcgen_path is equal to internal.
++
++To fix this, change the default value of RPCGEN_PATH from empty to
++internal
++
++Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
++---
++ configure.ac | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/configure.ac b/configure.ac
++index e82ff14..60f8431 100644
++--- a/configure.ac
+++++ b/configure.ac
++@@ -149,7 +149,7 @@ AC_ARG_WITH(rpcgen,
++ 	[AC_HELP_STRING([--with-rpcgen=internal], [use internal rpcgen instead of system one])],
++ 	rpcgen_path=$withval,
++ 	rpcgen_path=yes )
++-	RPCGEN_PATH=
+++	RPCGEN_PATH="internal"
++ 	if test "$rpcgen_path" = "yes"; then
++ 	    for p in /usr/local/bin/rpcgen /usr/bin/rpcgen /bin/rpcgen
++ 	    do if test -f $p ; then RPCGEN_PATH=$p ; break; fi ; done
++-- 
++2.17.1
++
+diff --git a/package/nfs-utils/nfs-utils.hash b/package/nfs-utils/nfs-utils.hash
+index 2bd5121186..bde94ec9ed 100644
+--- a/package/nfs-utils/nfs-utils.hash
++++ b/package/nfs-utils/nfs-utils.hash
+@@ -1,2 +1,3 @@
+-# From https://www.kernel.org/pub/linux/utils/nfs-utils/1.3.3/sha256sums.asc
+-sha256 700d689c5622c87953c34102e5befafc4d3c811e676852238f0dd79c9c0c084d  nfs-utils-1.3.3.tar.xz
++# From https://www.kernel.org/pub/linux/utils/nfs-utils/2.3.3/sha256sums.asc
++sha256 f68b34793831b05f1fd5760d6bdec92772c7684177586a99a61e7b444f336322  nfs-utils-2.3.3.tar.xz
++sha256 576540abf5e95029ad4ad90e32071385a5e95b2c30708c706116f3eb87b9a3de  COPYING
+diff --git a/package/nfs-utils/nfs-utils.mk b/package/nfs-utils/nfs-utils.mk
+index 9fa7ae200b..7c0fe08e7a 100644
+--- a/package/nfs-utils/nfs-utils.mk
++++ b/package/nfs-utils/nfs-utils.mk
+@@ -4,7 +4,7 @@
+ #
+ ################################################################################
+ 
+-NFS_UTILS_VERSION = 1.3.3
++NFS_UTILS_VERSION = 2.3.3
+ NFS_UTILS_SOURCE = nfs-utils-$(NFS_UTILS_VERSION).tar.xz
+ NFS_UTILS_SITE = https://www.kernel.org/pub/linux/utils/nfs-utils/$(NFS_UTILS_VERSION)
+ NFS_UTILS_LICENSE = GPL-2.0+
+-- 
+2.17.1

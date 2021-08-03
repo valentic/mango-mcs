@@ -1,0 +1,97 @@
+#!/usr/bin/env python2
+
+#####################################################################
+#
+#   Control power to Iridium switch
+#
+#   2017-12-20  Todd Valentic
+#               Expand to handle BeagleBone and Raspberry Pi
+#
+#   2018-01-04  Todd Valentic
+#               Use GPIO115 for on instead of GPIO117
+#
+#   2018-01-08  Todd Valentic 
+#               Add setup 
+#
+#####################################################################
+
+import commands
+import sys
+import time
+
+class Processor:
+
+    def __init__(self):
+        self.determineHardware()
+
+    def determineHardware(self):
+
+        cpuinfo = open('/proc/cpuinfo').read()
+
+        if 'AM33XX' in cpuinfo:
+            self.gpio_on=115
+            self.gpio_off=49
+        elif 'BCM2835' in cpuinfo:
+            self.gpio_on=17
+            self.gpio_off=4
+        else:
+            raise IOError('Unknown hardware')
+
+    def setState(self,gpio,state):
+        with open('/sys/class/gpio/gpio%s/value' % gpio,'w') as gpio: 
+            gpio.write('0')
+            gpio.flush()
+            time.sleep(0.5)
+            gpio.write('1')
+            gpio.flush()
+            time.sleep(0.5)
+            gpio.write('0')
+            gpio.flush()
+            time.sleep(0.5)
+
+        open('/tmp/iridium','w').write(state)
+
+    def on(self):
+        self.setState(self.gpio_on,'on')
+
+    def off(self):
+        self.setState(self.gpio_off,'off')
+
+    def setup(self):
+        open('/sys/class/gpio/export','w').write(str(self.gpio_on))
+        open('/sys/class/gpio/export','w').write(str(self.gpio_off))
+
+        open('/sys/class/gpio/gpio%s/direction'%self.gpio_on,'w').write('out')
+        open('/sys/class/gpio/gpio%s/direction'%self.gpio_off,'w').write('out')
+
+        self.on()
+
+    def status(self):
+        try:
+            print open('/tmp/iridium').read().strip()
+        except:
+            print 'unknown'
+
+if __name__ == '__main__':
+
+    if len(sys.argv)<2:
+        print 'Usage: iridiumctl on | off | setup | status'
+        sys.exit(0)
+
+    cmd = sys.argv[1]
+
+    iridium = Processor()
+
+    if cmd=='on':
+        iridium.on()
+    elif cmd=='off':
+        iridium.off()
+    elif cmd=='status':
+        iridium.status()
+    elif cmd=='setup':
+        iridium.setup()
+    else:
+        print 'Unknown command'
+        sys.exit(1)
+
+    sys.exit(0)

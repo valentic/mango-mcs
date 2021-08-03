@@ -1,0 +1,93 @@
+#!/usr/bin/env python2
+
+##########################################################################
+#
+#   Device control - Relay version
+#
+#   2018-06-08  Todd Valentic
+#               Initial implementation
+#
+#   2019-04-29  Todd Valentic
+#               Adapted to use relayctl
+#
+##########################################################################
+
+import sys
+import argparse
+import directory
+
+#-------------------------------------------------------------------------
+# Command Processors 
+#-------------------------------------------------------------------------
+
+def ProcessControl(relayctl,args):
+    relayctl.setDevice(args.device,args.state)
+    return True
+
+def ProcessStatus(relayctl,args):
+    devices = relayctl.getDevices()
+    status = relayctl.getStatus()
+    relays = status['relays']
+
+    for relay_id in sorted(relays):
+        state = relays[relay_id]
+        device = devices[relay_id]
+        if device['code']: 
+            print 'Relay %s: %3s - %s' % (relay_id,['off','on'][state],device['code'])
+
+    return True
+
+def ProcessList(relayctl,args):
+    widthDevice = 0
+    widthLabel  = 0
+
+    for relay,device in relayctl.getDevices().items():
+        if device['code']:
+            widthDevice = max(widthDevice,len(device['code']))
+            widthLabel  = max(widthLabel ,len(device['label']))
+
+    for relay,device in relayctl.getDevices().items():
+        if device['code']: 
+            fmt = '%%%ds - %%-%ds' % (widthDevice,widthLabel)
+            print fmt % (device['code'],device['label'])
+
+#-------------------------------------------------------------------------
+# Command Maps
+#-------------------------------------------------------------------------
+
+Commands = {
+    'set':      ProcessControl,
+    'status':   ProcessStatus, 
+    'list':     ProcessList,
+    }
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description="Device Control")
+    subparsers = parser.add_subparsers(dest='command')
+
+    control_parser = subparsers.add_parser('set')
+    control_parser.add_argument('device')
+    control_parser.add_argument('state',choices=['on','off'])
+
+    list_parser = subparsers.add_parser('list')
+
+    status_parser = subparsers.add_parser('status')
+
+    parser.add_argument('-v','--verbose',action='store_true',
+                    help='Verbose output')
+
+    # - Process ----------------------------------------------------------
+
+    args = parser.parse_args()
+
+    relayctl = directory.Directory().connect('relayctl')
+
+    result = Commands[args.command](relayctl,args)
+
+    if result:
+        sys.exit(0)
+    else:   
+        sys.exit(1)
+
+

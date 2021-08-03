@@ -1,0 +1,5 @@
+# md5, sha256 from https://pypi.org/pypi/pyephem/json
+md5	3d6c19d92a2a80fef87770f3e2007453  pyephem-3.7.6.0.tar.gz
+sha256	143146da32a07a4cf9725b5656ba095d24978c22a0363414203e72c39bae52bd  pyephem-3.7.6.0.tar.gz
+# Locally computed sha256 checksums
+sha256	acee512e3701083ad3ebe2c34b0e0326e2831d8e1e5412c8becf28a939e11e37  COPYING

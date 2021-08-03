@@ -1,0 +1,6 @@
+config BR2_PACKAGE_PYTHON_GPSD_PY3
+	bool "python-gpsd-py3"
+	help
+	  Python 3 library for working with gpsd.
+
+	  https://github.com/MartijnBraam/gpsd-py3

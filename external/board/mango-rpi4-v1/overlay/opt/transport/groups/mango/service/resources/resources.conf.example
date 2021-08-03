@@ -1,0 +1,107 @@
+[DEFAULT]
+
+[ProcessGroup]
+
+clients:                            server
+label:                              Resource monitor
+
+
+[server]
+
+command:                            server.py
+label:                              XML-RPC server
+
+service.name:                       resources
+
+status.service:                     sbcctl status
+
+resources:                          fan lna ettus sdd iridium gpio
+
+resource.*.states:                  off on
+resource.*.state.*.command:
+resource.*.state.*.service:         sbcctl %(name)s <param> <state>
+resource.*.state.on.values:         1 on
+resource.*.state.off.values:        0 off
+resource.*.status.section:          power
+resource.*.status.key:              %(name)s
+resource.*.reset.state:             off
+resource.*.default.state:           on
+
+resource.usb.state.off.service:
+resource.usb.state.off.command:     /bin/usboff
+
+resource.led.status.key:            led.<param>
+resource.led.params:                red green
+
+dio.mixin.state.*.service:          sbcctl setpin %(name)s <param> <state>
+dio.mixin.status.key:               Pin <param>
+
+resource.dio1.states:               off on
+resource.dio1.mixin:                dio.mixin
+resource.dio1.status.section:       DIO1
+resource.dio1.params:               0 1 2 
+resource.dio1.reset.state:          off
+resource.dio1.default.state:        off
+
+resource.dio2.mixin:                dio.mixin
+resource.dio2.status.section:       DIO2
+resource.dio2.params:               0 1 2 3 4 5 6 7
+
+power.mixin.states:                 off on
+power.mixin.state.on.values:        1 on
+power.mixin.state.off.values:       0 off
+power.mixin.reset.state:            off
+power.mixin.default.state:          off
+
+resource.iridium.mixin:             power.mixin
+resource.iridium.state.on.service:  sbcctl setpin DIO1 7 on
+resource.iridium.state.off.service: sbcctl setpin DIO1 7 off
+resource.iridium.status.section:    DIO1
+resource.iridium.status.key:        Pin 7
+
+resource.hydrophone.mixin:             power.mixin
+resource.hydrophone.state.on.service:  sbcctl setpin DIO1 6 on
+resource.hydrophone.state.off.service: sbcctl setpin DIO1 6 off
+resource.hydrophone.status.section:    DIO1
+resource.hydrophone.status.key:        Pin 6
+
+resource.wxt520.mixin:              power.mixin
+resource.wxt520.state.on.service:   sbcctl setpin DIO1 5 on
+resource.wxt520.state.off.service:  sbcctl setpin DIO1 5 off
+resource.wxt520.status.section:     DIO1
+resource.wxt520.status.key:         Pin 5
+
+resource.gps.mixin:                 power.mixin
+resource.gps.state.on.service:      sbcctl setpin DIO1 4 on
+resource.gps.state.off.service:     sbcctl setpin DIO1 4 off
+resource.gps.status.section:        DIO1
+resource.gps.status.key:            Pin 4
+
+resource.wifi.mixin:                power.mixin
+resource.wifi.state.on.service:     sbcctl setpin DIO1 3 on
+resource.wifi.state.off.service:    sbcctl setpin DIO1 3 off
+resource.wifi.status.section:       DIO1
+resource.wifi.status.key:           Pin 3
+
+
+resource.cpu.states:                min 42 166 max
+resource.cpu.state.min.values:      min
+resource.cpu.state.42.values:       42
+resource.cpu.state.166.values:      166
+resource.cpu.state.max.values:      max
+resource.cpu.reset.state:           42
+resource.cpu.default.state:         max
+
+#required:                           rs232=on
+required:                           rs232=on pc104=on usb=on
+
+background.development:             ethernet=on cpu=max
+background.deploy:                  cpu=min
+
+background.delay:                   1:00
+background.state.start:             %(required)s cpu=max
+#background.state.main:              %(background.development)s
+background.state.main:              %(required)s %(background.deploy)s
+background.state.stop:              %(required)s cpu=max
+
+

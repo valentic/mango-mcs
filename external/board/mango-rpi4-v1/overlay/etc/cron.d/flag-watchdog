@@ -1,0 +1,2 @@
+# Take action if various flag files are set
+* * * * * /usr/local/bin/flag-watchdog

@@ -1,0 +1,16 @@
+==========================================================================
+MANGO Camera System (MCS) Embedded System Build Package
+==========================================================================
+
+2021-08-02  Todd Valentic
+            Initial release
+
+Introduction
+--------------------------------------------------------------------------
+
+These are the board specific files for the embedded camera system of the 
+MANGO project (www.mangonetwork.org). The accompany the buildroot tool to
+automate the process of building firmware images.
+
+See the INSTALL file for details on how to build the images.
+

@@ -1,0 +1,3 @@
+# From https://www.kernel.org/pub/linux/utils/nfs-utils/2.3.3/sha256sums.asc
+sha256 f68b34793831b05f1fd5760d6bdec92772c7684177586a99a61e7b444f336322  nfs-utils-2.3.3.tar.xz
+sha256 576540abf5e95029ad4ad90e32071385a5e95b2c30708c706116f3eb87b9a3de  COPYING

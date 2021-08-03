@@ -1,0 +1,2 @@
+#!/bin/sh
+runuser - news -c "unset LANG; unset LC_COLLATE; /opt/news/bin/nntpsend"

@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# This should work but it didn't. Save for future development
+
+DEVICE=$1
+ACTION=$2
+
+logger "Device=${DEVICE}, Action=${ACTION}"
+
+case "${ACTION}" in
+ACTIVATE)
+    # Set dynamics mode to high-altitude (mode 8)
+	/opt/ubxtool/ubxtool -p MODEL -m 8 
+	;;
+
+DEACTIVATE)
+	;;
+esac
+
+exit 0
+

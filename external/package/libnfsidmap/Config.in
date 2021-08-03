@@ -1,0 +1,6 @@
+config BR2_PACKAGE_LIBNFSIDMAP
+	bool "libnfsidmap"
+	help
+	  Library used by the NFSv4 server to do userid mapping.
+
+	  http://www.citi.umich.edu/projects/nfsv4/linux/libnfsidmap

@@ -1,0 +1,68 @@
+#!/usr/bin/env python2
+
+#####################################################
+#
+#   Manual resource allocation
+#
+#   Use this when testing the system to manually
+#   allocate resources.
+#
+#   2009-11-06  Todd Valentic
+#               Initial implementation.
+#
+#   2009-11-11  Todd Valentic
+#               Wait until resource manager is ready
+#
+#####################################################
+
+import directory
+import optparse
+import sys
+import socket
+import time
+
+socket.setdefaulttimeout(30)
+
+class ManualAllocator:
+
+    def __init__(self,options):
+
+        self.options = options
+
+        while True:
+            try:
+                self.directory = directory.Directory()
+                self.resourceManager = self.directory.connect('resources')
+                self.resourceManager.ident()
+                break
+            except:
+                print 'Waiting for resource manager...'
+                time.sleep(10)
+
+    def run(self,resources):
+
+        if self.options.release:
+            resources = []
+
+        self.resourceManager.allocate('manual',resources)
+
+if __name__ == '__main__':
+
+    usage = 'manualmode [-r] resource1 [resource2] ...'
+
+    parser = optparse.OptionParser(usage=usage)
+
+    parser.add_option('-r','--release',dest='release',default=False,
+                        action='store_true',
+                        help='release all resources')
+
+    (options,args) = parser.parse_args()
+
+    if not options.release and len(args)==0:
+        print parser.usage
+        sys.exit(1)
+
+    ManualAllocator(options).run(args)
+
+    sys.exit(0)
+

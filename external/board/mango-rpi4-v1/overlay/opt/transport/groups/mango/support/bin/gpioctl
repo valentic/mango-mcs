@@ -1,0 +1,70 @@
+#!/usr/bin/env python2
+
+#####################################################################
+#
+#   Control a numato 8-channel USB GPIO module.
+#
+#   Commands sent via serial port (/dev/ttyACM0 by default).
+#
+#   2016-07-12  Todd Valentic
+#               Initial version
+#
+#####################################################################
+
+import serial
+import optparse
+import sys
+import datetime
+import pytz
+
+VERSION=1
+
+def RunCommand(options,cmd):
+
+    port = serial.Serial(options.device,19200,timeout=1)
+
+    port.write(cmd+'\r')
+
+    response = port.read(25).split('\n\r')
+
+    print response
+
+    return response
+
+def ShowStatus(options,args):
+
+    timestamp = datetime.datetime.utcnow()
+    timestamp = timestamp.replace(tzinfo=pytz.utc,microsecond=0)
+
+    pins = int(RunCommand(options,'gpio readall')[1],16)
+
+    print '[metadata]'
+    print 'version: %s' % VERSION
+    print 'timestamp: %s' % timestamp
+
+    print '[GPIO]'
+    for bit in range(8):
+        print 'Pin %d: %d' % (bit,bool(pins & 1<<bit))
+
+     
+
+    return 0
+
+
+
+
+if __name__ == '__main__':
+
+    parser = optparse.OptionParser()
+
+    parser.add_option('-d','--device',dest='device',
+                    help='serial device',default='/dev/ttyACM0')
+
+    (options,args) = parser.parse_args()
+
+    if args[0]=='status':
+        ShowStatus(options,args)
+    else:
+        RunCommand(options,' '.join(args))
+
+    sys.exit(0)

@@ -1,0 +1,2 @@
+DEVICES="/dev/gps0"
+OPTIONS="-n"

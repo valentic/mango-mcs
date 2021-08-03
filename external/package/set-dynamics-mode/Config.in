@@ -1,0 +1,5 @@
+config BR2_PACKAGE_SET_DYNAMICS_MODE
+    bool "set_dynamics-mode"
+    help
+    uBlox dynamics mode 
+

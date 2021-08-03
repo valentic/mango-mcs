@@ -1,0 +1,12 @@
+diff -Naurb mgetty-1.1.35.org/tio.c mgetty-1.1.35/tio.c
+--- mgetty-1.1.35.org/tio.c	2011-04-04 11:23:02.000000000 -0700
++++ mgetty-1.1.35/tio.c	2011-04-04 11:23:44.000000000 -0700
+@@ -311,6 +311,8 @@
+     /* be careful, only touch "known" flags */
+     t->c_cflag&= ~(CSIZE | CSTOPB | PARENB | PARODD | CLOCAL);
+     t->c_cflag|= CS8 | CREAD | HUPCL | ( local? CLOCAL:0 );
++    /* Todd Valentic - set 2 stop bits */
++    t->c_cflag|= CSTOPB; 
+     t->c_lflag = ECHOK | ECHOE | ECHO | ISIG | ICANON;
+ 
+ #if !defined(POSIX_TERMIOS)

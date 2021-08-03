@@ -1,0 +1,68 @@
+diff -Nuarb inn-2.6.3/configure.ac inn-2.6.3-new/configure.ac
+--- inn-2.6.3/configure.ac	2019-02-07 07:02:22.000000000 -0800
++++ inn-2.6.3-new/configure.ac	2019-03-08 15:19:54.672509219 -0800
+@@ -586,7 +586,7 @@
+     [AC_CHECK_FUNCS([madvise])
+      INN_FUNC_MMAP_SEES_WRITES
+      INN_FUNC_MMAP_NEEDS_MSYNC
+-     INN_FUNC_MSYNC_ARGS])
++     INN_FUNC_MSYNC_ARGS],[INN_FUNC_MSYNC_ARGS])
+ 
+ dnl Probes for system characteristics.
+ INN_SYS_STREAMS_SENDFD
+diff -Nuarb inn-2.6.3/m4/iov-max.m4 inn-2.6.3-new/m4/iov-max.m4
+--- inn-2.6.3/m4/iov-max.m4	2019-02-07 07:02:22.000000000 -0800
++++ inn-2.6.3-new/m4/iov-max.m4	2019-03-08 15:20:45.798451930 -0800
+@@ -73,7 +73,7 @@
+     [AC_RUN_IFELSE([_INN_MACRO_IOV_MAX_SOURCE],
+         inn_cv_macro_iov_max=`cat conftestval`,
+         inn_cv_macro_iov_max=error,
+-        16)
++        inn_cv_macro_iov_max="set in limits.h")
+      if test x"$inn_cv_macro_iov_max" = xerror ; then
+          AC_MSG_WARN([probe failure, assuming 16])
+          inn_cv_macro_iov_max=16
+diff -Nuarb inn-2.6.3/Makefile.global.in inn-2.6.3-new/Makefile.global.in
+--- inn-2.6.3/Makefile.global.in	2019-02-07 07:02:22.000000000 -0800
++++ inn-2.6.3-new/Makefile.global.in	2019-03-08 15:35:31.416462368 -0800
+@@ -309,8 +309,8 @@
+ RNEWSMODE	= @RNEWSMODE@
+ FILEMODE	= @FILEMODE@
+ 
+-OWNER		= -o $(RUNASUSER) -g $(RUNASGROUP)
+-ROWNER		= -o $(RUNASUSER) -g $(RNEWSGROUP)
++OWNER		= 
++ROWNER		= 
+ 
+ INSTALL		= $(top)/support/install-sh -c
+ 
+diff -Nuarb inn-2.6.3/samples/inn.conf.in inn-2.6.3-new/samples/inn.conf.in
+--- inn-2.6.3/samples/inn.conf.in	2019-02-07 07:02:22.000000000 -0800
++++ inn-2.6.3-new/samples/inn.conf.in	2019-03-08 15:35:31.440462342 -0800
+@@ -21,7 +21,7 @@
+ organization:                "A poorly-installed InterNetNews site"
+ ovmethod:                    tradindexed
+ hismethod:                   hisv6
+-pathhost:                    @HOSTNAME@
++#pathhost:                   localhost 
+ pathnews:                    @prefix@
+ 
+ #runasuser:
+@@ -149,7 +149,7 @@
+ 
+ # Monitoring
+ 
+-doinnwatch:                  true
++doinnwatch:                  false
+ innwatchbatchspace:          4000
+ innwatchlibspace:            25000
+ innwatchloload:              1000
+@@ -188,7 +188,7 @@
+ keepmmappedthreshold:        1024
+ #maxcmdreadsize:
+ maxforks:                    10
+-nicekids:                    4
++nicekids:                    0
+ nicenewnews:                 0
+ nicennrpd:                   0
+ pauseretrytime:              300

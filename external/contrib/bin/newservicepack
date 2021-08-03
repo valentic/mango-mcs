@@ -1,0 +1,90 @@
+#!/bin/sh
+
+##########################################################################
+#
+#   Create a new service pack
+#
+#   Usage: newservicepack <PROJECT>
+#
+#   Uses the servicepack template in $EXTERNAL/contrib/servicepack 
+#   Assumes we are running out of the contrib/bin directory.
+#
+#   This script will create the update skeleton in: 
+#
+#       $EXTERNAL/board/$PROJECT/updates/$DATE
+#
+#   It will use the current date and copy files from the example
+#   servicepack template directory. You then can add your own
+#   files to fill out the actual update.
+#
+#   2009-10-10  Todd Valentic
+#               Initial implementation
+#
+#   2021-07-18  Todd Valentic
+#               Updated for current buildroot systems.
+#
+##########################################################################
+
+# https://stackoverflow.com/questions/59895/how-to-get-the-source-directory-of-a-bash-script-from-within-the-script-itself
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+if [ $# -ne 1 ]; then
+    echo "Usage: newservicepack <project>" 1>&2
+    echo 
+    echo "where <project> is one of the project in external/boards"
+    echo 
+    exit 1
+fi
+
+EXTERNAL=$DIR/../..
+EXTERNAL="$( cd "$DIR/../.." >/dev/null 2>&1 && pwd )"
+
+DATE=$(date +%Y%m%d)
+
+PROJECT=$1
+SOURCEDIR=$EXTERNAL/contrib/servicepack
+PROJECTDIR=$EXTERNAL/board/$PROJECT
+UPDATEDIR=$PROJECTDIR/updates/$DATE
+SERVICEDIR=$UPDATEDIR/servicepack-$DATE
+
+if [ ! -d $PROJECTDIR ]; then
+    echo "Project directory does not exist: $PROJECTDIR" 1>&2
+    exit 1
+fi
+
+if [ -d $UPDATEDIR ]; then
+    echo "Update directory already exists: $UPDATEDIR" 1>&2
+    exit 1
+fi
+
+echo "Creating update directory: $UPDATEDIR"
+
+mkdir -p $UPDATEDIR
+
+echo "Copying example files."
+
+sed -e "s/\$DATE/$DATE/g" \
+    -e "s/\$PROJECT/$PROJECT/g" \
+    $SOURCEDIR/README > $UPDATEDIR/README
+
+cp $SOURCEDIR/packup $UPDATEDIR
+mkdir -p $SERVICEDIR/root
+
+sed -e "s/\$DATE/$DATE/g" \
+    -e "s/\$PROJECT/$PROJECT/g" \
+    $SOURCEDIR/servicepack-template/update > $SERVICEDIR/update
+
+chmod +x $SERVICEDIR/update
+
+echo
+echo "You can now populate the the root directory in"
+echo 
+echo "  $SERVICEDIR"
+echo 
+echo "The run packup to create the final tarball for upload." 
+echo
+echo "Finished."
+
+exit 0
+

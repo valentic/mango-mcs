@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+#   Starts innd 
+#
+
+RETVAL=0
+
+[ -d /opt/news/etc ] || exit 1
+[ -f /opt/news/etc/inn.conf ] || exit 6
+. /opt/news/lib/innshellvars || exit 1
+
+start() {
+  [ -d "$SPOOLDIR" ] || exit 1
+  [ -f "$HISTORY" -a -f "$HISTORY.hash" ] || {
+    echo -n $"Initializing INND:" >&2
+    su news -s /bin/sh -c '/opt/news/bin/makedbz -i -o'
+    echo OK
+  }
+  echo -n $"Starting INND: "
+  su news -s /bin/sh -c '/opt/news/bin/rc.news >> /opt/news/log/rc.news'
+  echo OK
+}
+
+stop() {
+  echo -n $"Stopping INND: "
+  su news -s /bin/sh -c '/opt/news/bin/rc.news stop >> /opt/news/log/rc.news'
+  echo OK
+}
+
+restart() {
+  stop
+  start
+}
+
+# See how we were called.
+case "$1" in
+  start)
+    start
+  ;;
+  stop)
+    stop
+  ;;
+  status)
+    status innd
+    RETVAL=$?
+  ;;
+  restart)
+    restart
+  ;;
+  *)
+    echo $"Usage: $0 {start|stop|status|restart}"
+    exit 3
+	;;
+esac
+
+exit $RETVAL

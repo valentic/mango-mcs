@@ -1,0 +1,1 @@
+OWFS_ARGS="-d /dev/onewire --allow_other -C" 

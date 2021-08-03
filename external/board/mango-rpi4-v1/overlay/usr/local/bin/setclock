@@ -1,0 +1,7 @@
+#!/bin/sh
+
+logger -s "Setting system time to $1"
+
+/bin/date -s $1
+/sbin/hwclock -w
+

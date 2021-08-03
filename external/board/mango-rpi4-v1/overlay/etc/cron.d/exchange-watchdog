@@ -1,0 +1,2 @@
+# Reboot if no connection to outside world 
+0 * * * * /usr/local/bin/exchange-watchdog

@@ -1,0 +1,64 @@
+#!/bin/sh
+
+##########################################################################
+#
+#   Manage the wpa_supplicant daemon
+#
+#   2021-07-08  Todd Valentic
+#               Initial implementation
+#
+##########################################################################
+
+SELF=`basename $0`
+WPA=wpa_supplicant
+PROGRAM=/usr/sbin/${WPA}
+CONF=/etc/${WPA}.conf
+INTERFACE=wlan0
+DRIVER=nl80211
+DAEMONMODE="-B"
+#LOGFILE=/var/log/$WPA.log
+LOGFILE=
+PIDFILE=/var/run/${WPA}.pid
+
+function start() {
+
+    OPTIONS="-c $CONF -i $INTERFACE -D $DRIVER $DAEMONMODE -P $PIDFILE"
+
+    # Log to a file or syslog
+    [ -n "$LOGFILE" ] && OPTIONS="$OPTIONS -f $LOGFILE"
+    [ -n "$LOGFILE" ] || OPTIONS="$OPTIONS -s"
+
+    echo "Starting wpa supplicant"
+    start-stop-daemon -S -q --exec $PROGRAM -- $OPTIONS
+}
+
+function stop() {
+    echo "Stopping wpa supplicant"
+    start-stop-daemon -K -q -p $PIDFILE 
+}
+
+function debug() {
+    stop
+    DAEMONMODE="-ddd"
+    start
+}
+
+function restart() {
+    stop
+    sleep 1
+    start
+}
+
+function status() {
+    pgrep -lf $PROGRAM
+}
+
+function usage() {
+    echo "Usage: $SELF <start|stop|status|debug>"
+    return 2
+}
+
+case $1 in
+    start|stop|debug|status) $1 ;;
+    *) usage ;;
+esac

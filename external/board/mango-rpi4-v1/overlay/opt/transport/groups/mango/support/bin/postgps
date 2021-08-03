@@ -1,0 +1,122 @@
+#!/usr/bin/env python2
+
+##########################################################################
+#
+#   Post GPS position data into cache for testing.
+#
+#   2011-02-24  Todd Valentic
+#               Initial implementation.
+#
+#   2011-02-25	Todd Valentic
+#		Added command line parameters for all options.
+#		Change calling convention
+#
+##########################################################################
+
+import sys
+import directory
+import optparse
+import datetime
+import socket
+
+socket.setdefaulttimeout(10)
+
+def FormatData(options):
+
+    now = datetime.datetime.utcnow()
+
+    results = {}
+
+    results['timestamp'] = [now.year,now.month,now.day,
+                            now.hour,now.minute,now.second]
+
+    results['latitude']     = options.latitude
+    results['longitude']    = options.longitude
+    results['speed']        = options.speed
+    results['heading']      = options.heading
+    results['pitch']        = options.pitch
+    results['roll']         = options.roll
+
+    return results
+
+def ShareFormat(position):
+
+    result = []
+    result.append("%f\t\tLatitude (N is positive)" % position['latitude'])
+    result.append("%f\t\tLongitude (E is positive)" % position['longitude'])
+    result.append("%f\t\tHeading" % position['heading'])
+    result.append("%f\t\tPitch" % position['pitch'])
+    result.append("%f\t\tRoll" % position['roll'])
+    result.append("%f\t\tSpeed" % position['speed'])
+
+    return '\n'.join(result)
+
+if __name__ == '__main__':
+
+    usage = 'postgps [options]'
+
+    parser = optparse.OptionParser(usage=usage)
+
+    parser.add_option('-n','--latitude',
+                        dest='latitude',
+                        default='0.0',
+                        metavar='DEG',
+                        type='float',
+                        help='latitude (degrees N)')
+
+    parser.add_option('-e','--longitude',
+    			dest='longitude',
+    			default='0.0',
+    			metavar='DEG',
+    			type='float',
+    			help='longitude (degrees E)')
+
+    parser.add_option('-a','--azimuth',
+    			dest='heading',
+    			default='0.0',
+    			metavar='DEG',
+    			type='float',
+    			help='longitude (degrees E)')
+
+    parser.add_option('-s','--speed',
+    			dest='speed',
+    			default='0.0',
+    			metavar='M/S',
+    			type='float',
+    			help='speed')
+
+    parser.add_option('-p','--pitch',
+    			dest='pitch',
+    			default='0.0',
+    			metavar='DEG',
+    			type='float',
+    			help='degrees')
+
+    parser.add_option('-r','--roll',
+    			dest='roll',
+    			default='0.0',
+    			metavar='DEG',
+    			type='float',
+    			help='degrees')
+
+    (options,args) = parser.parse_args()
+
+    data = FormatData(options)
+
+    print 'Position record:'
+
+    for key in sorted(data):
+    	print '  %10s: %s' % (key,data[key])
+
+    print 'Posting record to system cache'
+
+    dir = directory.Directory()
+    cache = dir.connect('cache')
+
+    cache.put('gps',data)
+
+    print 'Writing shared GPS data file (for DOAS)'
+
+    open('/tmp/share/gps.dat','w').write(ShareFormat(data))
+
+

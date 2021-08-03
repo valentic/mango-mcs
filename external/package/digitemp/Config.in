@@ -1,0 +1,9 @@
+config BR2_PACKAGE_DIGITEMP
+    bool "digitemp"
+    select BR2_PACKAGE_LIBUSB
+    select BR2_PACKAGE_LIBUSB_COMPAT
+    help
+    1-wire DigiTemp program
+
+    http://www.digitemp.com
+

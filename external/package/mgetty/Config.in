@@ -1,0 +1,6 @@
+config BR2_PACKAGE_MGETTY
+	bool "mgetty"
+	help
+	  getty
+
+	  http://mgetty.greenie.net/ 

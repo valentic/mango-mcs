@@ -1,0 +1,2 @@
+# Kill stale mgetty processes
+* * * * * /usr/local/bin/mgetty-watchdog

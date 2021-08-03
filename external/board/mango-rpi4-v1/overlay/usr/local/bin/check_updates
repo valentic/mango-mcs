@@ -1,0 +1,30 @@
+#!/bin/sh
+
+##########################################################################
+#
+#   Check for update servicepacks
+#
+#   If files are present in the /transmit/inbound/updates directory,
+#   reboot the system. The S14update init script will unpack and
+#   install the servicepacks.
+#
+#   2021-07-18  Todd Valentic
+#               Initial implementation
+#
+##########################################################################
+
+UPDATEDIR=/transmit/inbound/updates
+
+if [ ! -d "$UPDATEDIR" ]; then
+    logger "No update directory: $UPDATEDIR"
+    echo 0
+fi
+
+if find "$UPDATEDIR" -mindepth 1 -maxdepth 1 -type f | read; then
+    logger "Pending servicepack found in $UPDATEDIR. Rebooting."
+    /sbin/reboot
+    sleep 10
+fi
+
+exit 0
+

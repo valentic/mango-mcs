@@ -1,0 +1,4 @@
+User_Alias TRANSPORTUSERS = transport
+Cmd_Alias TRANSPORTCMDS = /sbin/reboot, /usr/local/bin/setstation
+
+TRANSPORTUSERS ALL = NOPASSWD: TRANSPORTCMDS

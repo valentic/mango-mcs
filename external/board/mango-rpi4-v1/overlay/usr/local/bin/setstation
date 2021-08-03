@@ -1,0 +1,79 @@
+#!/bin/bash
+
+##########################################################################
+#
+#   Set station name
+#
+#   Sets the station name in mulitple locations:
+#
+#       All *.template files in /opt and /etc
+#       The hostname
+#
+#   2021-06-29  Todd Valentic
+#               Updated from original script. 
+#                   - Add command line parameter handling
+#                   - Comment block
+#
+##########################################################################
+
+#-- Parse command line ---------------------------------------------------
+
+VERBOSE=0
+
+usage() {
+    echo "
+    Usage: setstation [options] <name>
+
+    Options:
+        -v | --verbose
+        -h | --help
+    "
+    exit 2
+}
+
+PARSED_ARGS=$(getopt -n setstation -o hv -l verbose,help -- "$@")
+VALID_ARGS=$?
+
+if [ "$VALID_ARGS" != "0" ]; then
+    usage
+fi
+
+eval set -- "$PARSED_ARGS"
+
+while :
+do
+    case "$1" in
+        -h | --help)    usage                   ;;
+        -v | --verbose) VERBOSE=1       ; shift ;;
+        
+        # End of argument processing
+        --) shift; break; ;;
+    esac
+done
+
+if [ $# -ne 1 ]; then
+    usage
+fi
+
+STATION=${1}
+
+#-- Helpers --------------------------------------------------------------
+
+log() {
+    [ "$VERBOSE" == "1" ] && echo $@
+}
+
+#-- Process --------------------------------------------------------------
+
+log Setting to station name $STATION
+
+find /opt /etc -name "*.template" | while read f ; do
+    TARGET=${f/.template/};
+    log Updating ${TARGET}
+    sed s/STATION/${STATION}/g ${f} > ${TARGET};
+done
+
+log Setting hostname 
+/bin/hostname -F /etc/hostname
+
+exit 0

@@ -1,0 +1,11 @@
+diff -Nur apcupsd/apcupsd.mk apcupsd.new/apcupsd.mk
+--- apcupsd/apcupsd.mk	2021-06-06 14:21:08.000000000 -0700
++++ apcupsd.new/apcupsd.mk	2021-07-20 19:01:27.922327849 -0700
+@@ -10,6 +10,7 @@
+ APCUPSD_LICENSE_FILES = COPYING
+ APCUPSD_CPE_ID_VENDOR = apcupsd
+ APCUPSD_CONF_OPTS = --disable-test
++APCUPSD_CONF_OPTS += --sysconfdir=/etc/apcupsd
+ 
+ ifneq ($(BR2_PACKAGE_APCUPSD_MODBUS_USB)$(BR2_PACKAGE_APCUPSD_USB),)
+ APCUPSD_CONF_ENV += ac_cv_path_usbcfg=$(STAGING_DIR)/usr/bin/libusb-config

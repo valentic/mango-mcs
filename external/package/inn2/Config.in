@@ -1,0 +1,14 @@
+config BR2_PACKAGE_INN2
+	bool "inn2" 
+	depends on BR2_USE_MMU # fork()
+    select BR2_PACKAGE_GAWK
+    select BR2_PACKAGE_OPENSSL
+    select BR2_PACKAGE_BZIP2
+    select BR2_PACKAGE_GZIP
+    select BR2_PACKAGE_PERL
+    select BR2_PACKAGE_PERL_MIME_TOOLS
+	help
+        INN (InterNetNews) is a very full-featured and flexible 
+        news server package.
+
+        https://www.eyrie.org/~eagle/software/inn/

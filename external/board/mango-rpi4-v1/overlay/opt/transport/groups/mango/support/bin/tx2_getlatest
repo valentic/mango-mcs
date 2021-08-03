@@ -1,0 +1,29 @@
+#!/bin/sh
+
+SSH_HOST=tx2
+SSH_CONF=/opt/transport/groups/balloon/support/helpers/tx2/ssh.conf
+
+SOURCE_DIR=/ssd/data/outbound
+
+TARGET_DIR=/transmit/outbound/imager
+
+srcfile=`ssh -F $SSH_CONF $SSH_HOST  "find $SOURCE_DIR -type f | sort -r  | head -1"`
+
+if [ $ -ne 0 ]; then
+    echo "Problem running ssh find"
+    exit 2
+fi
+
+if [ "x$srcfile" == "x" ]; then
+    echo No data files found
+    exit 1
+fi
+
+echo copy $srcfile to  $TARGET_DIR
+
+scp -F $SSH_CONF $SSH_HOST:$srcfile $TARGET_DIR
+
+# Clear the outbound directory
+ssh -F $SSH_CONF $SSH_HOST "find $SOURCE_DIR -type f -exec rm '{}' ';'" 
+
+exit 0

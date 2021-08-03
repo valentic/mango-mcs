@@ -1,0 +1,5 @@
+# md5, sha256 
+md5	6d8ab1506da21ae003f4628f93d05781 ufw-0.36.tar.gz 
+sha256	754b22ae5edff0273460ac9f57509c3938187e0cf4fb9692c6a02833fff33cfc ufw-0.36.tar.gz
+# Locally computed sha256 checksums
+sha256	fc82ca8b6fdb18d4e3e85cfd8ab58d1bcd3f1b29abe782895abd91d64763f8e7 COPYING

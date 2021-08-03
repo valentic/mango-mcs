@@ -1,0 +1,49 @@
+#!/bin/sh
+
+#####################################################################
+#
+#   Flag Watchdog
+#
+#   Check the flag directory to see if we need to power cycle: 
+#
+#       reboot.modem
+#       reboot.system 
+#
+#   2018-01-09  Todd Valentic
+#               Initial implementation.
+#
+#   2018-06-19  Todd Valentic
+#               Use devicectl for Iridium modem control
+#
+#####################################################################
+
+NAME=cron.flagwatchdog
+FLAGDIR=/transmit/flags
+REBOOTSYSTEM=${FLAGDIR}/reboot.system
+REBOOTMODEM=${FLAGDIR}/reboot.modem
+
+RebootSystem() {
+    logger -t $NAME "Rebooting system"
+    /sbin/reboot
+    sleep 10
+    exit 0
+}
+
+if [ -f $REBOOTSYSTEM ]; then
+    logger -t $NAME "Reboot system flag detected"
+    rm -f ${REBOOTSYSTEM}
+    RebootSystem
+fi
+
+if [ -f $REBOOTMODEM ]; then
+    logger -t $NAME "Reboot modem flag detected"
+    rm -f ${REBOOTMODEM}
+    /opt/transport/groups/balloon/support/bin/devicectl set sri_iridium off
+    logger -t $NAME "Modem off"
+    sleep 15
+    /opt/transport/groups/balloon/support/bin/devicectl set sri_iridium on
+    logger -t $NAME "Modem on"
+fi
+
+exit 0
+

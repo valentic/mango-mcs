@@ -1,0 +1,4 @@
+For Mango systems, this process group is a place holder for future
+applications where we need control over the startup/shutdown states
+of the PDU outlets. Right now, the group will simply exit after
+starting up.

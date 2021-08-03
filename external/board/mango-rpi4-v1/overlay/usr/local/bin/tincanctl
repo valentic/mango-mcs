@@ -1,0 +1,514 @@
+#!/usr/bin/env python
+
+###########################################################################
+#
+#   Tincan Network Tunnel client application 
+#
+#   2021-05-24  Todd Valentic
+#               Initial implementation
+#
+#   2021-07-21  Todd Valentic
+#               Add touch_flag to minimize writes if the flag is set.
+#
+###########################################################################
+
+import requests
+import sys
+import os
+import logging
+import argparse
+import subprocess
+import shlex
+import json
+import hashlib
+import uuid
+import socket
+
+try:
+    import http.client as http_client
+except ImportError:
+    # Python 2
+    import httplib as http_client
+
+REGISTERED='registered'
+REGISTERED_PENDING='registered.pending'
+PAUSED='paused'
+CHECKIN='checkin'
+CONFIG_DATA='config.json'
+
+#-------------------------------------------------------------------------
+# Helper Functions 
+#-------------------------------------------------------------------------
+
+def touch(fname, times=None):
+    with open(fname, 'a'):
+        os.utime(fname, times)
+
+def get_status_output(cmdline, **kwargs):
+    args = shlex.split(cmdline)
+    p = subprocess.Popen(args, **kwargs)
+    stdout, stderr = p.communicate()
+    return p.returncode, stdout, stderr
+
+def get_apikey(args):
+
+    filename = os.path.join(args.keydir,'api.key')
+
+    if not os.path.exists(filename):
+        raise ValueError('Missing API key file')
+
+    return open(filename).read().strip()
+
+def get_group(args):
+
+    filename = os.path.join(args.datadir,'group')
+
+    if not os.path.exists(filename):
+        raise ValueError('Missing group file')
+
+    return open(filename).read().strip()
+
+def get_server(args):
+
+    filename = os.path.join(args.datadir,'server')
+
+    if not os.path.exists(filename):
+        raise ValueError('Missing server file')
+
+    return open(filename).read().strip()
+
+def get_macaddr(args):
+    return open('/sys/class/net/eth0/address').read().strip()
+
+def get_serialnum(args):
+    # Strip out non-printable chars 
+    serialnum = open('/sys/firmware/devicetree/base/serial-number').read().strip()
+    return ''.join([c for c in serialnum if str.isalnum(c)])
+
+def get_uuid(args):
+
+    filename = os.path.join(args.datadir,'uuid')
+
+    try:
+        return open(filename).read().strip()
+    except:
+        return None
+
+def set_uuid(args):
+    if args.id_src=='serialnum':
+        id = get_serialnum(args)
+    elif args.id_src=='macaddr':
+        id = get_macaddr(args)
+    else:
+        id = uuid.uuid4().hex
+
+    filename = os.path.join(args.datadir,'uuid')
+
+    open(filename,'w').write(id)
+
+    return id 
+
+def has_uuid(args):
+    return get_uuid(args) is not None
+
+def get_public_sshkey(args):
+
+    filename = os.path.join(args.keydir,'ssh.key.pub')
+
+    if not os.path.exists(filename):
+        return None
+
+    return open(filename).read().strip()
+
+def has_public_sshkey(args):
+    return get_public_sshkey(args) is not None
+
+def create_sshkeys(args):
+
+    filename = os.path.join(args.keydir,'ssh.key')
+
+    cmd = 'ssh-keygen -q -t ed25519 -N "" -f %s' % filename
+
+    status,stdout,stderr = get_status_output(cmd)
+
+    return status==0
+
+def flagfile(args, flag):
+    return os.path.join(args.flagdir,flag)
+
+def datafile(args, filename):
+    return os.path.join(args.datadir, filename)
+
+def make_flagdir(args):
+    if not os.path.isdir(args.flagdir):
+        os.makedirs(args.flagdir)
+
+def get_flag(args, flag):
+    filename = flagfile(args,flag) 
+    return os.path.exists(filename)
+
+def set_flag(args, flag):
+    # Minimize writes - only touch if missing 
+    filename = flagfile(args,flag) 
+    if not os.path.exists(filename):
+        touch(filename)
+
+def touch_flag(args, flag):
+    filename = flagfile(args,flag) 
+    touch(filename)
+
+def clear_flag(args, flag):
+    filename = flagfile(args,flag) 
+    if os.path.exists(filename):
+        os.remove(filename)
+
+def is_registered(args):
+    return get_flag(args, REGISTERED) 
+
+def is_pending(args):
+    return get_flag(args, REGISTERED_PENDING) 
+
+def is_paused(args):
+    return get_flag(args, PAUSED) 
+
+def get_station_name(args):
+    # Same as short hostname, remove domain
+    return socket.gethostname().rsplit('.',2)[0]
+
+def set_station_name(args,name):    
+    cmd = '/usr/local/bin/setstation %s' % name
+    status, stdout, stderr = get_status_output(cmd)
+    return status==0
+
+def save_config(args, data):
+    filename = datafile(args, CONFIG_DATA)
+
+    payload = json.dumps(data)
+
+    if os.path.exists(filename):
+        new_checksum = hashlib.md5(payload).hexdigest()
+        old_checksum = hashlib.md5(open(filename).read()).hexdigest()
+
+        if new_checksum == old_checksum:
+            return
+
+    print('Saving config file')
+
+    open(filename,'w').write(payload)
+
+def load_config(args):
+    filename = datafile(args, CONFIG_DATA)
+
+    if os.path.exists(filename):
+        return json.loads(open(filename).read())
+
+    return {}
+
+def sshkey_match(args):
+
+    config = load_config(args)
+
+    server_sshkey_md5 = config.get('sshkey_md5')
+
+    if server_sshkey_md5 is None:
+        return False
+
+    my_sshkey = get_public_sshkey(args)
+
+    if my_sshkey is None:
+        return False
+
+    my_sshkey_md5 = hashlib.md5(my_sshkey.encode()).hexdigest()
+
+    return my_sshkey_md5 == server_sshkey_md5
+
+def update_sshkey(args):   
+        
+    data = dict(
+        sshkey = get_public_sshkey(args),
+        )
+
+    endpoint = 'nodes'
+    instance = get_uuid(args)
+
+    result = patch(args,endpoint,instance,data)
+    result.raise_for_status()
+
+    return True
+
+def post(args,endpoint,data):
+
+    apikey = get_apikey(args)
+    server = get_server(args)
+
+    url = '%s/api/mesh/%s' % (server,endpoint)
+    headers = {'MESH-APIKEY': apikey} 
+
+    return requests.post(url,headers=headers,data=data,timeout=args.timeout)
+
+def patch(args,endpoint,instance,data):
+
+    apikey = get_apikey(args)
+    server = get_server(args)
+
+    url = '%s/api/mesh/%s/%s' % (server,endpoint,instance)
+    headers = {'MESH-APIKEY': apikey} 
+
+    return requests.patch(url,headers=headers,data=data,timeout=args.timeout)
+ 
+#-------------------------------------------------------------------------
+# Command Processors 
+#-------------------------------------------------------------------------
+
+def ProcessRegister(args):   
+    logging.info('Register')
+
+    if is_registered(args):
+        logging.info('Already registered')
+        return True
+
+    if not has_public_sshkey(args):
+        logging.info('Generating SSH keys pair')
+        if not create_sshkeys(args):
+            logging.error('  - failed')
+            return False
+
+    if not has_uuid(args):
+        set_uuid(args)
+
+    data = dict(
+        uuid = get_uuid(args),
+        sshkey = get_public_sshkey(args),
+        group = get_group(args)
+        )
+    endpoint = 'nodes'
+
+    result = post(args,endpoint,data)
+
+    result.raise_for_status()
+
+    set_flag(args, REGISTERED_PENDING)
+
+    return True
+
+def ProcessUnregister(args):
+    logging.info('Unregistering')
+
+    clear_flag(args, REGISTERED_PENDING) 
+    clear_flag(args, REGISTERED) 
+
+def ProcessPause(args):
+    logging.info('Pausing')
+
+    set_flag(args,'paused') 
+
+def ProcessUnpause(args):
+    logging.info('Unpausing')
+
+    clear_flag(args,'paused') 
+
+def ProcessCheckin(args):   
+    logging.info('Checkin')
+
+    node_id = get_uuid(args)
+
+    if node_id is None:
+        raise RuntimeError('No UUID has been set') 
+
+    endpoint = 'nodes/%s/checkin' % node_id 
+    data = {}
+
+    result = post(args,endpoint,data)
+    result.raise_for_status()
+
+    config = result.json()
+
+    touch_flag(args, CHECKIN)
+
+    if config['pending']:
+        clear_flag(args, REGISTERED) 
+        set_flag(args, REGISTERED_PENDING)
+    else:
+        set_flag(args, REGISTERED)
+        clear_flag(args, REGISTERED_PENDING)
+
+    save_config(args,config)
+
+    if config.get('active',False) and config['name'] != get_station_name(args):
+        set_station_name(args,config['name'])
+        get_status_output('reboot')
+
+    return True
+
+def ProcessSetUUID(args):
+    id = set_uuid(args)
+
+    logging.info('Set UUID: %s' % id)
+
+    return True
+
+def ProcessStatus(args):   
+    logging.info('Status')
+
+    try:
+        apikey = get_apikey(args)
+    except:
+        apiKey = None
+
+    try:    
+        server = get_server(args)
+    except:
+        server = None
+
+    try:    
+        group = get_group(args)
+    except:
+        group = None
+
+    node_id = get_uuid(args)
+    sshkey = get_public_sshkey(args)
+
+    if has_public_sshkey(args):
+        if sshkey_match(args):
+            sshkey_status = 'OK'
+        else:
+            sshkey_status = 'Mismatch'
+    else:
+        sshkey_status = 'Missing'
+
+    if is_registered(args):
+        registered = 'Yes'
+    elif is_pending(args): 
+        registered = 'Pending'
+    else:
+        registered = 'No'
+
+    logging.info('Data dir  : %s' % args.datadir)
+    logging.info('Flag dir  : %s' % args.flagdir)
+    logging.info('Key dir   : %s' % args.keydir)
+    logging.info('Server    : %s' % server)
+    logging.info('Group     : %s' % group)
+    logging.info('API key   : %s' % apikey)
+    logging.info('SSH key   : %s' % sshkey_status)
+    logging.info('MAC addr  : %s' % get_macaddr(args))
+    logging.info('Serial num: %s' % get_serialnum(args))
+    logging.info('UUID      : %s' % node_id) 
+    logging.info('Registered: %s' % registered)
+
+    return True
+
+def ProcessCron(args):   
+    logging.info('Cron')
+
+    if is_paused(args): 
+        logging.info('paused')
+        return
+
+    # On a new system, create UUID
+
+    if not has_uuid(args):
+        set_uuid(args)
+
+    # Try a checkin. We might already be registered. 
+
+    try:
+        ProcessCheckin(args)
+    except requests.exceptions.HTTPError as err:
+        if 'NOT FOUND' not in str(err):
+            raise(err)
+
+    # Check if our SSH key matches the one on the server
+
+    if is_pending(args):
+        return True
+
+    if is_registered(args):
+
+        if not has_public_sshkey(args):
+            logging.info('Generating SSH keys pair')
+            if not create_sshkeys(args):
+                logging.error('  - failed')
+                return False
+
+        if sshkey_match(args):
+            return True
+        else:
+            logging.info('Updating public SSH key on server')
+            return update_sshkey(args)
+
+    # System not found or key mismatch, try to register 
+
+    return ProcessRegister(args)
+
+#-------------------------------------------------------------------------
+# Command Maps
+#-------------------------------------------------------------------------
+
+Commands = {
+    'register':         ProcessRegister,
+    'unregister':       ProcessUnregister,
+    'pause':            ProcessPause,
+    'unpause':          ProcessUnpause,
+    'checkin':          ProcessCheckin,
+    'set-uuid':         ProcessSetUUID,
+    'status':           ProcessStatus,
+    'cron':             ProcessCron
+    }
+
+if __name__ == '__main__':
+   
+    desc = 'Tincan Network Tunnel Control'
+    parser = argparse.ArgumentParser(description=desc)
+    subparsers = parser.add_subparsers(dest='command')
+
+    checkin_parser = subparsers.add_parser('checkin')
+    status_parser = subparsers.add_parser('status')
+    register_parser = subparsers.add_parser('register')
+    setuuid_parser = subparsers.add_parser('set-uuid')
+    unregister_parser = subparsers.add_parser('unregister')
+    pause_parser = subparsers.add_parser('pause')
+    unpause_parser = subparsers.add_parser('unpause')
+    cron_parser = subparsers.add_parser('cron')
+
+    parser.add_argument('-d','--datadir',dest='datadir',
+            default='/etc/tincan/data',
+            help='Data directory (default /etc/tincan/data)')
+
+    parser.add_argument('-k','--keydir',dest='keydir',
+            default='/etc/tincan/keys',
+            help='Data directory (default /etc/tincan/keys)')
+
+    parser.add_argument('-f','--flagdir',dest='flagdir',
+            default='/etc/tincan/flags',
+            help='Data directory (default /etc/tincan/flags)')
+
+    parser.add_argument('-i','--id',dest='id_src',
+            default='serialnum',
+            choices=['serialnum','macaddr','generate'],
+            help='Unique ID (default is serialnum)')
+
+    parser.add_argument('-t','--timeout',dest='timeout',
+            default=15,type=int,
+            help='Timeout in seconds (default 5s)')
+
+    parser.add_argument('-v','--verbose',action='store_true',
+            help='Verbose output')
+
+    #-- Process ----------------------------------------------------
+
+    args = parser.parse_args()
+
+    if args.verbose:
+        http_client.HTTPConnection.debuglevel = 1
+        logging.getLogger().setLevel(logging.DEBUG)
+        requests_log = logging.getLogger("requests.packages.urllib3")
+        requests_log.setLevel(logging.DEBUG)
+        requests_log.propagate = True
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    make_flagdir(args)
+
+    result = Commands[args.command](args)
+
+    sys.exit(0 if result else 1)

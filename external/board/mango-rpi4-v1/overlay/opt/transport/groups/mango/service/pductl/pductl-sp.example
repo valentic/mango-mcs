@@ -1,0 +1,32 @@
+[server]
+
+pdus:   pdu1 
+
+pdu.pdu1.rail.1.label:  Iridium SBD     [ 5V] 
+pdu.pdu1.rail.2.label:  FMU TS-7250     [12V]
+pdu.pdu1.rail.3.label:  Iridium 9523    [ 5V]
+pdu.pdu1.rail.4.label:  Jetson TX2      [12V]  
+pdu.pdu1.rail.5.label:  GPS compass     [12V]
+pdu.pdu1.rail.6.label:  Freewave amp    [12V] 
+pdu.pdu1.rail.7.label:  PTU motors      [12V]
+pdu.pdu1.rail.8.label:  (spare)         [12V] 
+
+pdu.pdu1.rail.1.device: iridium-sbd 
+pdu.pdu1.rail.2.device: fmu 
+pdu.pdu1.rail.3.device: iridium 
+pdu.pdu1.rail.4.device: jetson
+pdu.pdu1.rail.5.device: compass
+pdu.pdu1.rail.6.device: freewave
+pdu.pdu1.rail.7.device: ptu
+pdu.pdu1.rail.8.device: relay8 
+
+pdu.pdu1.rail.1.stages: active
+pdu.pdu1.rail.2.stages: active
+pdu.pdu1.rail.1.stopState: on
+pdu.pdu1.rail.2.stopState: on
+
+pdu.pdu1.rail.8.stage.active.state: off
+pdu.pdu1.rail.4.stopState: keep
+pdu.pdu1.rail.5.stopState: keep
+
+

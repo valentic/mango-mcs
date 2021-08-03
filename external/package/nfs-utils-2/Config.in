@@ -1,0 +1,43 @@
+comment "nfs-utils-2 needs a toolchain w/ threads"
+	depends on BR2_USE_MMU
+	depends on !BR2_TOOLCHAIN_HAS_THREADS
+
+config BR2_PACKAGE_NFS_UTILS_2
+	bool "nfs-utils-2"
+	depends on BR2_TOOLCHAIN_HAS_THREADS # libtirpc, rpcbind
+	depends on BR2_USE_MMU # fork()
+	select BR2_PACKAGE_LIBTIRPC if !BR2_TOOLCHAIN_HAS_NATIVE_RPC
+	select BR2_PACKAGE_RPCBIND # runtime
+	help
+	  The NFS Linux kernel server.
+
+	  http://linux-nfs.org/
+
+if BR2_PACKAGE_NFS_UTILS_2
+
+config BR2_PACKAGE_NFS_UTILS_2_RPCDEBUG
+	bool "rpcdebug"
+	help
+	  The RPC debugging utility
+
+config BR2_PACKAGE_NFS_UTILS_2_RPC_LOCKD
+	bool "rpc.lockd"
+	help
+	  NFS lock manager for Linux kernels older than 2.4
+
+config BR2_PACKAGE_NFS_UTILS_2_RPC_RQUOTAD
+	bool "rpc.rquotad"
+	help
+	  NFS remote quota server
+
+config BR2_PACKAGE_NFS_UTILS_2_NFS4
+    bool "NFSv4 support"
+    depends on BR2_PACKAGE_NFS_UTILS_2
+    select BR2_PACKAGE_LIBEVENT
+    select BR2_PACKAGE_LIBNFSIDMAP
+    select BR2_PACKAGE_KEYUTILS
+    select BR2_PACKAGE_LVM2
+    help
+      Support for NFSv4.  Don't forget to enable the kernel facility also.
+
+endif

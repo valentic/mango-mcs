@@ -1,0 +1,84 @@
+#!/bin/sh
+
+#####################################################################
+#
+#   mgetty Watchdog
+#
+#   Check the modem lockfile to see if a dialin shell process has
+#   been around "too long" - indicating that the connection was
+#   dropped while somebody had been logged in. Sometimes the shell
+#   doesn't logout and busybox sh doesn't have a timeout parameter
+#   that would automatically logout the shell.
+#
+#   To work around that, we check the date of the lockfile and
+#   kill the owner process if the file is older than 4-hours
+#   (an unlikely duration for an Iridium dialup). The process
+#   is only killed if the lock indicates it is /bin/sh
+#
+#   2011-09-13  Todd Valentic
+#               Initial implementation.
+#
+#   2012-02-27  Todd Valentic
+#               Reduce timeout to be 60 minutes since this usually
+#                   happens when we are interactively working on
+#                   the system. A shorter timeout means I can get
+#                   back on sooner.
+#
+#   2013-11-18  Todd Valentic
+#               Reduce to 10 minutes.
+#
+#   2017-10-26  Todd Valentic
+#               Adapted to BBB/Rpi systems
+#               Fixed bug - string comparison is = not ==
+#               Check for -bash instead of -sh
+#
+#   2018-01-09  Todd Valentic
+#               Set timeout to be 30-minutes
+#
+#   2021-06-20  Todd Valentic
+#               Silently exit if lock file not present so we don't
+#                   spam the system log file on systems without an
+#                   an Iridium modem.
+#
+#####################################################################
+
+DEVICE=iridium
+NAME=mgetty-watchdog
+KEEPALIVEFLAG=/tmp/keepalive.$NAME
+LOCKFILE=/var/lock/LCK..$DEVICE
+MINS=30
+
+if [ ! -f $LOCKFILE ]; then
+    exit 0
+fi
+
+logger -t $NAME "Checking $LOCKFILE"
+
+if [ -f $KEEPALIVEFLAG ]; then
+	logger -t $NAME "Flag exists, skipping"
+	exit 0
+fi
+
+STALELOCK=`find $LOCKFILE -mmin +$MINS -print`
+
+if [ ! $STALELOCK ]; then
+    exit 0
+fi
+
+LOCKPID=$((`cat $STALELOCK`))
+
+if [ ! -d /proc/$LOCKPID ]; then
+    logger -t $NAME "Strange, lock file, but no process"
+    rm $LOCKFILE
+    exit 0
+fi
+
+CMDLINE=`cat /proc/$LOCKPID/cmdline`
+
+if [ "$CMDLINE" = "-bash" ]; then
+    logger -t $NAME "Stale login shell detected. Killing."
+    kill -9 $LOCKPID
+fi
+
+exit 0
+

@@ -1,0 +1,202 @@
+#!/usr/bin/env python2
+
+##########################################################################
+#
+#   Inmarsat UAV200 Command Line Control
+#
+#   2018-07-19  Todd Valentic
+#               Initial implementation
+#
+##########################################################################
+
+import sys
+import argparse
+import logging
+
+from uav200lib import UAV200 
+
+#-------------------------------------------------------------------------
+# Display Helpers 
+#-------------------------------------------------------------------------
+
+def PrintRBME(data):
+    print '[RBME]'
+    print 'Temperature: %.1f C' % data[0]
+    print 'Pressure   : %.1f mb' % data[1]
+    print 'Altitude   : %.1f m' % data[2]
+    print 'Humidity   : %.1f %%' % data[3]
+
+def PrintRH(data):
+    print '[RH]'
+    for index,state in enumerate(data):
+        print 'Heater %d: %s' % (index+1,['Off','On'][state])
+
+def PrintRP(data):
+    print '[RP]'
+    for index,state in enumerate(data):
+        print 'Port %2d: %s' % (index+1,['Off','On'][state])
+
+def PrintRS(data):
+    print '[RS]'
+    for index,state in enumerate(data):
+        print 'Port %2d: %s' % (index+1,['Off','On'][state])
+
+def PrintRT(data):
+    print '[RT]'
+    for index,temp in enumerate(data):
+        print 'Probe %2d: %5.1f C' % (index+1,temp)
+
+def PrintRLTC(data):
+    print '[RLTC]'
+    volts = data['volts']
+    amps = data['amps']
+    for index in range(len(amps)):
+        print 'Port %2d: %4.1f V  %6.3f A' % (index+1,volts[index],amps[index])
+
+#-------------------------------------------------------------------------
+# Command Processors 
+#-------------------------------------------------------------------------
+
+def ProcessLD(pdu,args):
+    print pdu.LD(args.state)
+    return True
+
+def ProcessSA(pdu,args):
+    print pdu.SA(args.state)
+    return True
+
+def ProcessSP(pdu,args):
+    print pdu.SP(args.fet,args.state)
+    return True
+
+def ProcessRTS(pdu,args):
+    print pdu.RTS()
+    return True
+
+def ProcessRBME(pdu,args):
+    data = pdu.RBME()
+
+    if args.verbose: 
+        PrintRMBE(data)
+    else:
+        print data
+
+    return True
+
+def ProcessRH(pdu,args):
+    data = pdu.RH()
+
+    if args.verbose:
+        PrintRH(data)
+    else:
+        print data
+
+    return True
+
+def ProcessRP(pdu,args):
+    data = pdu.RP()
+
+    if args.verbose:
+        PrintRP(data)
+    else:
+        print data
+
+    return True
+
+def ProcessRS(pdu,args):
+    data = pdu.RS()
+
+    if args.verbose:
+        PrintRS(data)
+    else:
+        print data
+
+    return True
+
+
+def ProcessRT(pdu,args):
+    data = pdu.RT() 
+
+    if args.verbose:
+        PrintRT(data)
+    else:
+        print data
+
+    return True
+
+def ProcessReboot(uav200,args):
+    uav200.reboot()
+    print 'Rebooted. Make sure initialize PDC'
+    return True
+
+def ProcessConnected(uav200,args):
+    result = uav200.isConnected()
+    if result:
+        print 'Connection OK'
+    else:
+        print 'Not connected'
+    return True
+
+def ProcessSignal(uav200,args):
+    data = uav200.signalLevel() 
+
+    if args.verbose:
+        print '%f.1dB' % data 
+    else:
+        print data
+
+    return True
+
+def ProcessStatus(uav200,args):
+    data = uav200.systemInfo()
+
+    if args.verbose:
+        for key,value in data.items():
+            print '%15s: %s' % (key,value)
+    else:
+        print data 
+
+    return True
+
+#-------------------------------------------------------------------------
+# Command Maps
+#-------------------------------------------------------------------------
+
+Commands = {
+    'signal':       ProcessSignal,
+    'status':       ProcessStatus, 
+    'reboot':       ProcessReboot,
+    'isconnected':  ProcessConnected,
+    }
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description="Inmarsat UAV200 Control")
+    subparsers = parser.add_subparsers(dest='command')
+
+    signal_parser = subparsers.add_parser('signal')
+    status_parser = subparsers.add_parser('status')
+    reboot_parser = subparsers.add_parser('reboot')
+    connected_parser = subparsers.add_parser('isconnected')
+
+    parser.add_argument('-a','--host',dest='host',default='192.168.0.1',
+                    help='UAV200 address (default 192.168.0.1)')
+
+    parser.add_argument('-p','--port',dest='port',default=5454,type=int,
+                    help='USAV200 port (default is 5454)')
+
+    parser.add_argument('-v','--verbose',action='store_true',
+                    help='Verbose output')
+
+    # - Process ----------------------------------------------------------
+
+    args = parser.parse_args()
+
+    uav200 = UAV200(host=args.host,port=args.port,level=logging.INFO) 
+    result = Commands[args.command](uav200,args)
+
+    if result:
+        sys.exit(0)
+    else:   
+        sys.exit(1)
+

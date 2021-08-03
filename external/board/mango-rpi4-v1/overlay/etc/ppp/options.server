@@ -1,0 +1,8 @@
+-detach
+asyncmap 0
+local
+crtscts
+lock
+lcp-echo-interval 10
+lcp-echo-failure 6
+debug

@@ -1,0 +1,10 @@
+Enable nfsv4 in buildroot:
+
+    https://github.com/openstack/manila-test-image/blob/master/patches/nfs-utils-enable-nfsv4.patch
+
+Good description of build and startup requirements:
+
+    http://git.linux-nfs.org/?p=steved/nfs-utils.git;a=blob;f=README;h=7034c0091d49bb50b7b59dd3e4e8add933c6dbe9;hb=HEAD
+
+Patch for nfs-utils 2.3.3 
+    https://marc.info/?l=buildroot&m=153703810013005&q=mbox

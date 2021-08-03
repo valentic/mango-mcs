@@ -1,0 +1,329 @@
+#!/bin/bash
+
+##########################################################################
+#
+#   SSH Tunnel Link 
+#
+#   This script will bring up the SSH tunnel if it is down. Run it
+#   from cron every minute to maintain the link.
+#
+#   Call it as: 
+#       
+#       sshlink2.tincan start
+#       sshlink2.tincan stop
+#       sshlink2.tincan restart
+#       sshlink2.tincan status
+#       sshlink2.tincan help
+#
+#   A profile is specified with -p and is one of:
+#
+#       primary 
+#       backup 
+#
+#   It will source the following files:
+#
+#       /etc/tincan/sshlink/defaults.conf
+#       /etc/tincan/sshlink/profile.conf (or backup.conf)
+#       /etc/tincan/data/config.json
+#
+#   The SSH key should be in:
+#
+#       /etc/tincan/keys/ssh.key
+#
+#   Run from cron: 
+#
+#       /etc/cron.d/sshlink-<server>
+#
+#       */1 * * * * root /usr/local/bin/sshlink <server>
+#
+#   To log output to the system logger, use -v|--verbose or set
+#   VERBOSE=1 in the config file (profile or default). 
+#
+#   Exit codes:
+#
+#       0 - No error
+#       1 - Error  
+#       2 - Error parsing command line args
+#       3 - No config.json file
+#       4 - SSHD is not running
+#
+#   2021-06-18  Todd Valentic
+#               Adapted from earlier versions (sshlink2)
+#
+#   2021-07-05  Todd Valentic
+#               Add ExitOnForwardFailure
+#               Check if sshd is running
+#
+#   2021-07-20  Todd Valentic
+#               Add SSH_* options to config file
+#
+#   2021-07-26  Todd Valentic
+#               Handle pid look up when not registered yet.
+#
+##########################################################################
+
+##########################################################################
+# Only continue if we have configuration settings from the server 
+
+BASEDIR=/etc/tincan
+PROFILE=primary
+VERBOSE=0
+
+usage() {
+    echo "
+    Usage: sshlink2 [options] <command>
+
+    Commands:
+       start      - Start if link is down
+       stop       - Drop link
+       restart    - Drop link and start
+       status     - Check if link is running
+       help       - Show help
+   
+    Options:
+       -h         - Show help
+       -v         - Verbose output
+       -p PROFILE - Profile (see below)
+   
+    Profiles:
+       primary
+       backup
+    "
+
+    exit 2
+}
+
+PARSED_ARGS=$(getopt -n sshlink2 -o hvp: -l help,verbose,profile: -- "$@")
+VALID_ARGS=$?
+
+if [ "$VALID_ARGS" != "0" ]; then 
+    usage
+fi
+
+eval set -- "$PARSED_ARGS"
+
+while :
+do
+    case "$1" in 
+        -h | --help)    usage                       ;;  
+        -v | --verbose) VERBOSE=1       ; shift     ;;
+        -p | --profile) PROFILE="$2"    ; shift 2   ;;
+        # end of argument processing
+        --) shift; break; ;;
+        # shouldn't get here - checked in VALID_ARGS above
+        *)  echo "Unknown option: $1"
+            usage  ;;
+    esac
+done
+
+COMMAND=${1}
+
+CONFDIR=$BASEDIR/sshlink
+DATADIR=$BASEDIR/data
+KEYDIR=$BASEDIR/keys
+
+CONF_DEFAULTS=$CONFDIR/defaults.conf
+CONF_PROFILE=$CONFDIR/$PROFILE.conf
+CONF_JSON=$DATADIR/config.json
+
+[ -f $CONF_JSON ] || exit 3
+
+##########################################################################
+# Default values from default.conf and $PROFILE.conf 
+
+INND_PORT=
+CUTRATE=
+EXTRA_OPTS=
+LOGGER_OPTS=
+SSHKEY=$KEYDIR/ssh.key
+
+SSH_SERVERALIVEINTERVAL=30
+SSH_SERVERALIVECOUNT=3
+SSH_CONNECTTIMEOUT=20
+
+##########################################################################
+# Load configuration files
+#
+# From config.json (supplied by the server):
+#
+#   MESH_SSH_HOST           - Remote host  
+#   MESH_SSH_HOST_PORT      - Remote host port for SSH
+#   MESH_SSH_USER           - Remote host user for SSH
+#   MESH_SSH_PORT           - Reverse port forward SSH to this port 
+#   MESH_SSH_PORT_ALT       - Reverse port used in backup profile 
+
+if [ -f $CONF_DEFAULTS ]; then
+    . $CONF_DEFAULTS
+fi
+
+if [ -f $CONF_PROFILE ]; then
+    . $CONF_PROFILE
+fi
+
+# Parse JSON config file using jq program into variables:
+#   { key: value, key: value, ... } -> MESH_KEY=value 
+
+while IFS="=" read -r key value; do
+    export MESH_${key^^}="$value"
+done < <(\
+    jq -r '. | to_entries | .[] | .key + "=" + (.value|tostring)' \
+    $CONF_JSON)
+
+if [ -n "$INND_PORT" ] ; then
+    INND_OPT="-L $INND_PORT:127.0.0.1:119"
+else
+    INND_OPT=""
+fi
+
+if [ "$PROFILE" == "primary" ] ; then
+    CALLBACK_PORT=$MESH_SSH_PORT
+elif [ "$PROFILE" == "backup" ] ; then
+    CALLBACK_PORT=$MESH_SSH_PORT_ALT
+else
+    CALLBACK_PORT=0
+fi
+
+LOGGER="logger $LOGGER_OPTS -t sshlink-$PROFILE"
+
+##########################################################################
+# Log if verbose
+
+log() {
+    [ "$VERBOSE" == "1" ] && $LOGGER $@
+}
+
+##########################################################################
+# Find the PID of the sshd process 
+
+find_sshd_pid() {
+    local pid=`ps -o pid,args -C sshd --no-headers | grep "/usr/sbin/sshd" | cut -f 1 -d s`
+    echo $pid 
+}
+
+
+##########################################################################
+# Find the PID of the current SSH process (if running)
+
+find_ssh_pid() {
+
+    if [ -z "$MESH_SSH_USER" ]; then
+        echo ""
+        return
+    fi
+
+    local pid=`ps -o pid,args -C ssh --no-headers | grep "ssh $MESH_SSH_USER@$MESH_SSH_HOST" | grep $CALLBACK_PORT | cut -f 1 -d s`
+    echo $pid 
+}
+
+##########################################################################
+# Check if we are running, stop if CUTRATE times 
+
+check_link() {
+
+    local CURMINUTE=`date +"%M"`
+    local LINKPID=$(find_ssh_pid)
+    local SSHDPID=$(find_sshd_pid)
+
+    if [ -z "$SSHDPID" ]; then
+        log "No sshd process, exiting"
+        if [ -n "$LINKPID" ]; then
+            kill $LINKPID
+        fi
+        exit 4
+    fi
+
+    if [ -n "$LINKPID" ] ; then
+        if [ -n "$CUTRATE" ] && [ $((CURMINUTE % CUTRATE)) -eq 0 ]; then
+            log "Cut time reached. Dropping link"
+            kill $LINKPID
+        else 
+            log "Link is up, doing nothing"
+            exit 0
+        fi
+    else
+        log "Link is down, trying to bring up"
+    fi
+}
+
+##########################################################################
+# Drop link if running
+
+drop_link() {
+
+    local LINKPID=$(find_ssh_pid)
+
+    if [ -n "$LINKPID" ] ; then
+        log "Dropping link."
+        kill $LINKPID
+        exit 0
+    fi
+}
+
+
+##########################################################################
+# Start link
+
+start_link() {
+
+    ssh $MESH_SSH_USER@$MESH_SSH_HOST \
+        -n -f -C -N \
+        -o TCPKeepAlive=no \
+        -o ServerAliveInterval=$SSH_SERVERALIVEINTERVAL \
+        -o ServerAliveCountMax=$SSH_SERVERALIVECOUNT \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=$SSH_CONNECTTIMEOUT \
+        -o ExitOnForwardFailure=yes \
+        -p $MESH_SSH_HOST_PORT \
+        -i $SSHKEY \
+        -R $CALLBACK_PORT:127.0.0.1:22  \
+        ${INND_OPT}  \
+        ${EXTRA_OPTS}  \
+        2>&1 /dev/null
+
+    if [ "$?" -eq 0 ] ; then
+        log "Success starting link" 
+        exit 0
+    else
+        log "Failed starting link (code $?)"
+        exit 1
+    fi
+
+}
+
+show_status() {
+
+    local LINKPID=$(find_ssh_pid)
+
+    if [ -n "$LINKPID" ] ; then
+        echo "$PROFILE link is up (PID $LINKPID)" 
+    else
+        echo "$PROFILE link is down"
+    fi
+}
+
+case "$COMMAND" in 
+
+    start)
+        check_link
+        start_link
+        ;;
+
+    stop)
+        drop_link
+        ;;
+
+    restart)
+        drop_link
+        start_link
+        ;;
+
+    status)
+        show_status
+        ;;
+    *)
+        usage
+        ;;
+esac
+
+exit 0
+

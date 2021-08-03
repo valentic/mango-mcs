@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Run as "nohup delayexchange &"
+
+sleep 60
+exchange
+

@@ -1,0 +1,1 @@
+SUBSYSTEM=="net", SUBSYSTEMS=="usb", NAME="eth1"

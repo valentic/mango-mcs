@@ -1,0 +1,10 @@
+#!/bin/sh
+
+if grep 'AM33XX' /proc/cpuinfo > /dev/null 2>&1; then
+    exec sbcctl.bbb "$@" 
+elif grep 'ts471x' /proc/cpuinfo > /dev/null 2>&1; then
+    exec sbcctl.ts7250v2 "$@"
+else
+    exec sbcctl.rpi "$@" 
+fi
+

@@ -1,0 +1,16 @@
+config BR2_PACKAGE_UFW
+	bool "ufw"
+	help
+	  Uncomplicated firewall 
+
+	  https://wiki.ubuntu.com/UncomplicatedFirewall
+
+if BR2_PACKAGE_UFW
+
+config BR2_PACKAGE_UFW_ENABLED
+    bool "enable to run at boot"
+    default y
+    help
+      Run UFW at system boot
+
+endif

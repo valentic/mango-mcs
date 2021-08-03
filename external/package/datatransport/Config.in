@@ -1,0 +1,10 @@
+config BR2_PACKAGE_DATATRANSPORT
+	bool "datatransport" 
+	depends on BR2_USE_MMU # fork()
+    select BR2_PACKAGE_PYTHON
+    select BR2_PACKAGE_INN2
+	help
+        Data Transport Network
+
+        https://www.datatransport.org
+

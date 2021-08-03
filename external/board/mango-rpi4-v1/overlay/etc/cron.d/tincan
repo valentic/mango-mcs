@@ -1,0 +1,2 @@
+# Manage tincan network 
+*/1 * * * * /usr/local/bin/tincanctl cron

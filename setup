@@ -1,0 +1,95 @@
+#!/bin/bash
+
+##########################################################################
+#
+#   Setup project
+#  
+#   2021-07-20  Todd Valentic
+#               Initial implementation
+#
+##########################################################################
+
+set -e
+shopt -s nullglob
+
+PROJECT="${1:-mango-rpi4-v1}"
+DEFCONFIG=${PROJECT}_defconfig
+
+BUILDROOT_VER=2021.05
+BUILDROOT_PKG=buildroot-${BUILDROOT_VER}.tar.bz2
+BUILDROOT_URL=https://buildroot.org/downloads/${BUILROOT_PKG}
+
+BASEDIR="$(cd "$(dirname "$0")"; pwd)"
+BUILD_DIR="$BASEDIR/build"
+DOWNLOAD_DIR="$BASEDIR/dl"
+PROJECT_DIR="$BUILD_DIR/$PROJECT"
+EXTERNAL_DIR="$BASEDIR/external"
+
+echo "-------------------------------------------------------------------"
+echo "Project  :    $PROJECT"
+echo "Buildroot:    $BUILDROOT_VER"
+echo "Build dir:    $PROJECT_DIR"
+echo "Download dir: $DOWNLOAD_DIR"
+echo "External dir: $EXTERNAL_DIR"
+echo "-------------------------------------------------------------------"
+echo
+
+mkdir -p ./{$BUILD_DIR,$DOWNLOAD_DIR}
+
+if [ ! -d "$EXTERNAL_DIR" ]; then
+    echo "Missing external directory: $EXTERNAL_DIR"
+    exit 1
+else
+    echo "Found external directory"
+fi
+
+# Download ---------------------------------------------------------------
+
+if [ ! -f "$DOWNLOAD_DIR/${BUILDROOT_PKG}" ]; then
+    echo "Downloading $BUILDROOT_PKG"
+    wget $BUILDROOT_PKG -P $DOWNLOAD_DIR -N
+else
+    echo "Found $BUILDROOT_PKG in $DOWNLOAD_DIR"
+fi
+
+# Unpack -----------------------------------------------------------------
+
+if [ -d "$PROJECT_DIR" ]; then
+    echo "Found build directory. Doing nothing."
+    #exit 0
+else
+    echo "Unpacking buildroot"
+    mkdir -p $PROJECT_DIR
+    tar xf $DOWNLOAD_DIR/$BUILDROOT_PKG --strip 1 -C $PROJECT_DIR
+fi
+
+# Patch ------------------------------------------------------------------
+# note - patch returns 1 if it has already been applied. The ! at the 
+# start of the line prevents the script from exiting (set -e).
+
+for PACKAGE_PATH in $EXTERNAL_DIR/patches/*; do
+    echo "Patching $PACKAGE_PATH"
+    PACKAGE=$(basename "$PACKAGE_PATH")
+    for PATCHFILE in $PACKAGE_PATH/*.patch; do
+        echo "   - $PATCHFILE"
+        ! patch -N -p1 -r - -d $PROJECT_DIR/package/$PACKAGE < $PATCHFILE
+    done
+done
+
+# Set configuration ----------------------------------------------------00
+
+# Replaces the usual interactive "make menuconfig" to bootstrap
+make -C $PROJECT_DIR defconfig BR2_DEFCONFIG=$EXTERNAL_DIR/configs/$DEFCONFIG
+
+make -C $PROJECT_DIR BR2_EXTERNAL=${EXTERNAL_DIR} $DEFCONFIG
+
+echo
+echo "-------------------------------------------------------------------"
+echo "Ready to build. Run make in the project directory:"
+echo
+echo "    cd $PROJECT_DIR"
+echo "    make"
+echo
+echo "-------------------------------------------------------------------"
+
+exit 0

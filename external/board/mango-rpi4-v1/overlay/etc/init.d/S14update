@@ -1,0 +1,90 @@
+#!/bin/sh
+#
+# Run update scripts
+#
+# History:
+#
+#   2008-03-27  Todd Valetic
+#               Initial implementation.
+#
+#   2009-08-21  Todd Valentic
+#               Update paths:
+#                   /home/ftp -> /transmit/comms
+#
+#   2009-10-27  Todd Valentic
+#                   /transmit/comms -> /transmit/inbound/updates
+
+SRCPATH=/transmit/inbound/updates
+WORKDIR=/transmit/inbound/updates.working
+LOGPATH=/transmit/outbound/updates
+LOGFILE=`date +"$LOGPATH/updates-%Y%m%d-%H%M%S"`
+
+if [ ! -e $SRCPATH ] ; then
+    exit 0
+fi
+
+start() {
+    echo "Running update scripts: "
+
+    if [ ! -e $LOGPATH ] ; then
+        mkdir -p -m 775 $LOGPATH
+        chown transport:transport $LOGPATH
+    fi
+
+    for file in $SRCPATH/* ;do
+
+        if [ ! -f $file ] ; then
+            echo "  no updates found"
+            continue
+        fi
+
+        echo "  $file"
+
+        echo "---------------------------------------" >> $LOGFILE
+        echo "Running: $file" >> $LOGFILE
+
+        if [ -e $WORKDIR ] ; then
+            rm -rf $WORKDIR
+        fi
+
+        mkdir -p $WORKDIR
+
+        case "$file" in
+            *.tgz | *.tar.gz )
+                tar zxvf $file -C $WORKDIR
+                ;;
+            *.tar.bz2 )
+                tar jxvf $file -C $WORKDIR
+                ;;
+            * )
+                cp $file $WORKDIR/update
+                chmod +x $WORKDIR/update
+                ;;
+        esac
+
+        rm $file
+
+        cd $WORKDIR
+        [ -x update ] && ./update >> $LOGFILE 2>&1
+
+    done
+
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    ;;
+  restart)
+    stop
+    start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart}"
+    exit 1
+    ;;
+esac
+
+exit 0

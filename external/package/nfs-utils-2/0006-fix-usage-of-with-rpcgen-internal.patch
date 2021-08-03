@@ -1,0 +1,34 @@
+From cc9a9b1a724b8da7fb0834824bb0e69ff4611a3c Mon Sep 17 00:00:00 2001
+From: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+Date: Sat, 15 Sep 2018 20:55:12 +0200
+Subject: [PATCH] fix usage of --with-rpcgen=internal
+
+Since commit
+http://git.linux-nfs.org/?p=steved/nfs-utils.git;a=commitdiff;h=fd5ccdc449a0ef79498191aecb3e44120e813618,
+internal rpcgen can't be used anymore since RPCGEN_PATH is set to empty
+and is not updated if rpcgen_path is equal to internal.
+
+To fix this, change the default value of RPCGEN_PATH from empty to
+internal
+
+Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+---
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index e82ff14..60f8431 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -149,7 +149,7 @@ AC_ARG_WITH(rpcgen,
+ 	[AC_HELP_STRING([--with-rpcgen=internal], [use internal rpcgen instead of system one])],
+ 	rpcgen_path=$withval,
+ 	rpcgen_path=yes )
+-	RPCGEN_PATH=
++	RPCGEN_PATH="internal"
+ 	if test "$rpcgen_path" = "yes"; then
+ 	    for p in /usr/local/bin/rpcgen /usr/bin/rpcgen /bin/rpcgen
+ 	    do if test -f $p ; then RPCGEN_PATH=$p ; break; fi ; done
+-- 
+2.17.1
+

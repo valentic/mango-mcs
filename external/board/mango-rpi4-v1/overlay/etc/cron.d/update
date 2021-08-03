@@ -1,0 +1,2 @@
+# Check for updates 
+*/1 * * * * /usr/local/bin/check_updates

@@ -1,0 +1,6 @@
+config BR2_PACKAGE_TS_UTILS_7250V2
+	bool "ts-utils-7250v2"
+	help
+	  Collection of utility programs for the TS-7250v2 
+
+	  ftp://ftp.embeddedarm.com/ts-arm-sbc/ts-7250-v2-linux/sources/ 

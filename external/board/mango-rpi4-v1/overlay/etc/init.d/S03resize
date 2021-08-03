@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Resize root parition  
+#
+
+start() {
+    if [ -f /resize_root ] ; then
+        echo "Resizing root partition"
+        /sbin/resize_partition.sh
+    fi
+}
+
+case $1 in
+    start)
+        start
+        ;;
+    stop)
+        ;;
+    *)
+        echo $"Usage: $0 {start}"
+        exit 1
+esac
+
+exit $?
+
