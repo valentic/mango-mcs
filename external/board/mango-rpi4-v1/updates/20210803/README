@@ -1,0 +1,18 @@
+==========================================================================
+20210803  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Change camera_a to redline
+    - Change camera_b to greenline
+    - Set cameras variable in mango.conf
+    - Use %(cameras)s in:
+        mango/monitor/cameras/cameras.conf
+        mango/monitor/relays/relays.conf
+        mango/service/resources/resources.conf
+    - List new camera names in pductl
+    - Expand device name fielf in monitor
+    - Revision 1.4 
+
+
