@@ -1,6 +1,10 @@
 /home/data r 2775 transport transport - - - - -
-/transmit  r 2775 transport transport - - - - -
-/etc/tincan r 2775 transport transport - - - - -
+/transmit r -1 transport transport - - - - -
+/transmit d 2775 transport transport - - - - -
+/transmit/flags  d 2775 transport transport - - - - -
+/transmit/schedules  d 2775 transport transport - - - - -
+/etc/tincan r -1 transport transport - - - - -
+/etc/tincan d 2775 transport transport - - - - -
 /etc/tincan/keys d 0700 transport transport - - - - -
 /etc/tincan/keys/api.key f 0600 transport transport - - - - -
 /etc/mgetty+sendfax/login.config f 0600 root root - - - - -
