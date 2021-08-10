@@ -1,0 +1,11 @@
+==========================================================================
+20210810  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Fix issue with setting camera configuration on restart 
+    - Set shutdown.timeout in seconds instead of rate
+    - Release 1.5 
+
+
