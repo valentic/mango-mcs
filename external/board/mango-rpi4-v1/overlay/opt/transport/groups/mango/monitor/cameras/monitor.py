@@ -15,6 +15,11 @@
 #   2021-07-25  Todd Valentic
 #               Add warmup and cooldown parameters
 #
+#   2021-08-09  Todd Valentic
+#               Extend cache timeout to be 10-minutes
+#               Make sure to clear prev_camera_config when off
+#               Add some debug log entries 
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -37,7 +42,7 @@ class CameraMonitor(NightDataMonitorComponent):
         self.prev_camera_config = None
 
         self.station = self.get('station','Unknown')
-        self.cacheService.set_timeout(self.name,60*5)
+        self.cacheService.set_timeout(self.name,60*10)
 
     def getParameters(self, schedule):
 
@@ -86,6 +91,13 @@ class CameraMonitor(NightDataMonitorComponent):
 
         self.diskFree = diskFree 
         self.diskMount = diskMount 
+
+        if schedule:
+            self.log.info('schedule: %s' % schedule.name)
+        else:
+            self.log.info('schedule: None')
+
+        self.log.debug('camera config: %s' % self.camera_config)
 
     def isOn(self):
         status = self.getStatus()
@@ -137,6 +149,8 @@ class CameraMonitor(NightDataMonitorComponent):
             self.cacheService.clear(self.name)
             self.camera.close()
             self.camera = None
+            self.camera_config = None
+            self.prev_camera_config = None
 
         self.clearResources()
 
@@ -150,7 +164,7 @@ class CameraMonitor(NightDataMonitorComponent):
         # Only download to camera if different 
 
         if self.camera_config != self.prev_camera_config:
-            self.log.info('Updating camera configuration')
+            self.log.info('Updating camera configuration: %s' % self.camera_config)
             self.camera.initialize(config=self.camera_config)
             self.prev_camera_config = self.camera_config
 
@@ -234,6 +248,10 @@ class CameraMonitor(NightDataMonitorComponent):
 
         image_data.latitude = location['latitude']
         image_data.longitude = location['longitude']
+
+        self.log.debug('image_data.bin_x: %s' % image_data.bin_x)
+        self.log.debug('image_data.bin_y: %s' % image_data.bin_y)
+        self.log.debug('image_data.label: %s' % image_data.label)
 
         return image_data 
 
