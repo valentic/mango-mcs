@@ -1,0 +1,158 @@
+#!/usr/bin/env python
+
+##########################################################################
+#
+#   RPi4 LED control
+#
+#   Details:
+#
+#   https://ask.fedoraproject.org/t/raspberry-pi-dtparam/11081/3
+#   https://www.raspberrypi.org/forums/viewtopic.php?t=252049
+#
+#   For the onboard ethernet:
+#       # Select expansion register 4
+#       mdiotool w eth0 0x17 0xf04 
+#       Forced off LED1 7:3 0x4 LED0 3:0 0x4
+#       mdiotool w eth0 0x15 0x044
+#
+#   Different Ethernet LED state (Pi4):
+#
+#       0=Speed/Activity    1=Speed
+#       2=Flash activity    3=FDX
+#       4=Off               5=On
+#       6=Alt               7=Speed/Flash
+#       8=Link              9=Activity
+#
+#   Default LED1 0 (speed/activity) - green
+#           LED0 8 (link) - amber
+#
+#   2021-08-15  Todd Valentic
+#
+##########################################################################
+
+import re
+import os
+import sys
+import argparse
+import commands
+
+POWER_LED = '/sys/class/leds/led0'
+ACTIVITY_LED = '/sys/class/leds/led1'
+
+#-------------------------------------------------------------------------
+# Helper functions
+#-------------------------------------------------------------------------
+
+def set_trigger(pathname, trigger):
+    filename = os.path.join(pathname,'trigger')
+    open(filename,'w').write(trigger)
+
+def get_trigger(pathname):
+    filename = os.path.join(pathname,'trigger')
+    output = open(filename,'r').read()
+    pattern = '\[(.*)\]'
+
+    return re.findall(pattern, output)[0]
+
+def set_brightness(pathname, value):
+    filename = os.path.join(pathname,'brightness')
+    open(filename,'w').write(str(value))
+
+def get_brightness(pathname):
+    filename = os.path.join(pathname,'brightness')
+    output = open(filename,'r').read().strip()
+
+    return int(output)
+
+def set_state(pathname, state):
+    set_trigger(pathname, 'none')
+    set_brightness(pathname, int(state=='on'))
+
+def get_state(pathname):
+    value = get_brightness(pathname)
+    return 'on' if value > 0 else 'off'
+
+def set_state_eth0(state):
+
+    cmd = 'mdio-tool w eth0 0x17 0xf04'
+    output = commands.getoutput(cmd)
+
+    if state == 'off':
+        cmd = 'mdio-tool w eth0 0x15 0x044'
+        output = commands.getoutput(cmd)
+    else:
+        cmd = 'mdio-tool w eth0 0x15 0x080'
+        output = commands.getoutput(cmd)
+
+def get_state_eth0():
+    
+    cmd = 'mdio-tool w eth0 0x17 0xf04'
+    status, output = commands.getstatusoutput(cmd)
+
+    cmd = 'mdio-tool r eth0 0x15'
+    status, output = commands.getstatusoutput(cmd)
+
+    state = int(output, 16)
+    
+    if state == 0x044:
+        return 'off'
+    else:
+        return 'on'
+
+#-------------------------------------------------------------------------
+# Command Processors 
+#-------------------------------------------------------------------------
+
+def ProcessSet(args):
+
+    if args.device == 'power' or args.device == 'all':
+        set_state(POWER_LED, args.state)
+
+    if args.device == 'activity' or args.device == 'all':
+        set_state(ACTIVITY_LED, args.state)
+    
+    if args.device == 'eth0' or args.device == 'all':
+        set_state_eth0(args.state)
+
+    return 0
+
+def ProcessStatus(args):
+    print('[LED]')
+    print('power: %s' % get_state(POWER_LED)) 
+    print('activity: %s' % get_state(ACTIVITY_LED)) 
+    print('eth0: %s' % get_state_eth0())
+    return 0
+
+def ProcessReset(args):
+    set_trigger(POWER_LED, 'actpwr')
+    set_trigger(ACTIVITY_LED, 'mmc0')
+    set_state_eth0('on')
+    return 0
+
+#-------------------------------------------------------------------------
+# Main
+#-------------------------------------------------------------------------
+
+Commands = {
+    'set':      ProcessSet,
+    'status':   ProcessStatus,
+    'reset':    ProcessReset
+}
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='LED Control')
+    subparsers = parser.add_subparsers(dest='command')
+
+    set_parser = subparsers.add_parser('set')
+    set_parser.add_argument('device',choices=['power','activity','eth0','all'])
+    set_parser.add_argument('state', choices=['on','off'])
+
+    status_parser = subparsers.add_parser('status')
+    reset_parser = subparsers.add_parser('reset')
+
+    args = parser.parse_args()
+
+    result = Commands[args.command](args)
+
+    sys.exit(result)
