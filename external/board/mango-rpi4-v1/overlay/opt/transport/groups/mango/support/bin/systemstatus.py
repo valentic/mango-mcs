@@ -21,6 +21,9 @@
 #   2021-05-24  Todd Valentic
 #       Add MAC address for Ethernet devices
 #
+#   2021-08-15  Todd Valentic
+#       Add temperature section
+#
 ###########################################################
 
 from datetime       import datetime
@@ -29,6 +32,7 @@ import os
 import sys
 import StringIO
 import ConfigParser
+import glob
 
 class ResourceMonitor:
 
@@ -194,6 +198,18 @@ class ResourceMonitor:
 
         stats.set(section,'devices',' '.join(devs))
 
+    def updateTemps(self, stats):
+
+        zones = glob.glob('/sys/class/thermal/thermal_zone*')
+        
+        section = 'Temperature'
+        stats.add_section(section)
+
+        for zone in sorted(zones):
+            temp_c = open(os.path.join(zone,'temp')).read().strip()
+            temp_c = float(temp_c)/1000
+            stats.set(section, os.path.basename(zone), temp_c) 
+
     def status(self):
 
         timestamp = datetime.now()
@@ -208,6 +224,7 @@ class ResourceMonitor:
         self.updateUptime(stats)
         self.updateNetwork(stats)
         self.updateSwaps(stats)
+        self.updateTemps(stats)
 
         buffer = StringIO.StringIO()
         stats.write(buffer)

@@ -13,6 +13,9 @@
 #   2021-08-02  Todd Valentic
 #               Improve spacing in PDU table
 #
+#   2021-08-15  Todd Valentic
+#               Add temperatures 
+#
 ########################################################################
 
 import os
@@ -331,6 +334,9 @@ class Monitor:
         else:
             self.prevSystemStatus = data
 
+        release = data.get('Versions','release.version')
+        self.win.addstr(y,x+6,' - Release %s' % release, curses.A_UNDERLINE) 
+
         uptime = round(data.getfloat('Uptime','seconds'))
         uptime = datetime.timedelta(seconds=uptime)
 
@@ -339,6 +345,10 @@ class Monitor:
         self.win.addstr(y+1,x,'Uptime: %s' % uptime) 
         self.win.addstr(y+2,x,'Load  : %s' % data.getfloat('Load','1min'))
         self.win.addstr(y+3,x,'Disk  : %.1f%% used' % diskused)
+
+        for k,zone in enumerate(sorted(data.options('Temperature'))):
+            temp_c = data.getfloat('Temperature',zone)
+            self.win.addstr(y+4+k,x,'Zone %d: %.1f C' % (k,temp_c))
 
         y=9
         self.win.addstr(y+0,x, '%-5s    %-8s    %-8s' % ('Device','Tx','Rx'), curses.A_UNDERLINE)
