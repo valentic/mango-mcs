@@ -1,0 +1,7 @@
+config BR2_PACKAGE_MDIOTOOL
+	bool "mdiotool"
+	help
+        MDIO tool 
+
+        https://github.com/PieVo/mdio-tool
+
