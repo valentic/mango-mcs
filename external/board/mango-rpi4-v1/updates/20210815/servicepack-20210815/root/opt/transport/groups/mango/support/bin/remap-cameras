@@ -1,0 +1,29 @@
+#!/bin/sh
+
+##########################################################################
+#
+#   Force a remapping of the cameras.
+#
+#       - Stops the mango/monitor/cameras process group
+#       - Removes the current mapping file
+#       - Starts the process group again which will force a new mapping
+#
+#   2021-07-29  Todd Valentic
+#               Initial implementation
+#
+##########################################################################
+
+PROCESSGROUP=mango/monitor/cameras
+MAPFILE=/opt/transport/var/${PROCESSGROUP}/manager/camera_map.json
+
+echo "Stopping camera process group"
+transportctl stop $PROCESSGROUP
+
+echo "Removing mapping file"
+rm -f $MAPFILE
+
+echo "Starting camera process group"
+transportctl start $PROCESSGROUP
+
+exit 0
+

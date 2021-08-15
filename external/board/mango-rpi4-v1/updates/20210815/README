@@ -1,0 +1,12 @@
+==========================================================================
+20210815  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add uhubctl to control USB port power 
+    - Add mdiotool to control Ethernet port LEDs
+    - Add scripts to control onboard LEDs 
+    - Release 1.7 
+
+

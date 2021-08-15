@@ -1,0 +1,224 @@
+#!/usr/bin/env python2
+
+#####################################################################
+#
+#   SBC control 
+#
+#   Need to remain compatible with TS7260 version.
+#
+#   2017-10-10  Todd Valentic
+#               Initial version
+#
+#####################################################################
+
+import optparse
+import sys
+import logging
+import collections
+import datetime
+import pytz
+import pigpio
+import commands
+import os
+import time
+
+VERSION=1
+
+GPIOS = sorted([4,17,27,22,5,6,13,19,26,18,23,24,25,12,16,20,21]) 
+
+class Command:
+    
+    def __init__(self,name,callback,numOptions,usage,desc):
+        self.name       = name
+        self.callback   = callback
+        self.numOptions = numOptions
+        self.usage      = usage
+        self.desc       = desc
+
+class Processor:
+    
+    def __init__(self):
+        self.defineCommands()
+
+    def setOptions(self,options):
+        self.options = options
+
+    def defineCommands(self):
+
+        self.commands = collections.OrderedDict() 
+
+        self.addCommand('status',self.onStatus,0,'','DIO and device status')
+        #self.addCommand('gpio',self.onGPIO,2,'<pin> <dir>','Set pin in/out')
+        #self.addCommand('setpin',self.onSetPin,2,'<pin> <state>','Set pin state')
+        #self.addCommand('reset',self.onReset,0,'','Set pins to output and low')
+        self.addCommand('device',self.onDevice,2,'<device> <state>','Set device power state')
+
+    def addCommand(self,*pos):
+        name = pos[0] 
+        self.commands[name] = Command(*pos) 
+
+    def getUsage(self):
+        usage = [] 
+        
+        usage.append('')
+        usage.append('')
+
+        for name,command in self.commands.items():
+            line = '%10s %-20s %s' % (name,command.usage,command.desc)
+            usage.append(line)
+
+        usage.append('')
+        usage.append('<device> - usb | iridium') 
+        usage.append('<dir>    - in or out')
+        usage.append('<state>  - 0|off or 1|on')
+
+        return '\n'.join(usage)
+
+    def gpioCommand(self,cmd):
+        print 'TBD'
+        return
+
+    def run(self,args):
+        
+        self.pi = pigpio.pi()
+
+        if not self.pi:
+            print 'Unable to connect to pigpio daemon'
+            return 4
+
+        try:
+            command = self.commands[args[0]]
+        except:
+            print 'Unknown command: %s' % args[0]
+            return 1 
+
+        if len(args)<command.numOptions:
+            print 'Too few options'
+            return 2
+
+        try:
+            return command.callback(args)
+        except:
+            logging.exception('Problem running command')
+            return 3
+
+    def usb(self,option):
+        return commands.getoutput('usbctl %s' % option)
+
+    def iridium(self,option):
+        if option=='off':
+            self.pi.write(4,0)
+            time.sleep(0.5)
+            self.pi.write(4,1)
+            time.sleep(0.5)
+            self.pi.write(4,0)
+            open('/tmp/iridium','w').write('off')
+
+        elif option=='on':
+            self.pi.write(17,0)
+            time.sleep(0.5)
+            self.pi.write(17,1)
+            time.sleep(0.5)
+            self.pi.write(17,0)
+            open('/tmp/iridium','w').write('on')
+
+        else:
+            if os.path.exists('/tmp/iridium'):
+                return open('/tmp/iridium').read()
+            else:
+                # We will assume that it is off
+                return 'off'
+            
+    def onStatus(self,args):
+
+        timestamp = datetime.datetime.utcnow()
+        timestamp = timestamp.replace(tzinfo=pytz.utc,microsecond=0)
+
+        print '[metadata]'
+        print 'version: %s' % VERSION
+        print 'timestamp: %s' % timestamp
+
+        print '[GPIO]'
+
+        bank1 = self.pi.read_bank_1()
+
+        for io_num in GPIOS: 
+            print 'GPIO %d: %d' % (io_num,bool(bank1 & 1<<io_num))
+
+        print '[temp]'
+        cpu = float(open('/sys/class/thermal/thermal_zone0/temp').read())/1000.
+        #gpu = commands.getoutput('vcgencmd measure_temp')
+        #gpu = float(gpu.split('=')[-1].split("'")[0])
+        print 'cpu: %s' % cpu
+        #print 'gpu: %s' % gpu
+
+        print '[Device]'
+        print 'usb: %s' % self.usb('status')
+        print 'iridium: %s' % self.iridium('status')
+
+        return 0
+
+    def onReset(self,args):
+        self.gpioCommand('gpio iomask ff')
+        self.gpioCommand('gpio iodir 00')
+        self.gpioCommand('gpio writeall 00')
+        return 0
+
+    def onGPIO(self,args):
+        self.gpioCommand(' '.join(args[1:]))
+        return 0
+
+    def onSetPin(self,args):
+        
+        pin = int(args[1])
+        state = args[2]
+
+        if state in ['0','off']:
+            self.gpioCommand('gpio clear %d' % pin)
+        elif state in ['1','on']:
+            self.gpioCommand('gpio set %d' % pin)
+        else:
+            print 'Unknown state: %s' % state
+            return 1
+
+        return 0
+
+    def onDevice(self,args):
+
+        name = args[1]
+        state = args[2]
+
+        if name=='usb':
+            self.usb(state)
+            return 0
+        elif name=='iridium':
+            self.iridium(state)
+            return 0
+        else:
+            print 'Unknown device: %s' % name
+            return 1
+
+if __name__ == '__main__':
+
+    processor = Processor()
+
+    parser = optparse.OptionParser(usage=processor.getUsage())
+
+    parser.add_option('-n','--noadc',dest='noadc',action='store_true',
+                    help='No ADC readings (not used, here for compatability)',default=False)
+
+    parser.add_option('-v','--verbose',dest='verbose',action='store_true',
+                    help='Verbose debugging output',default=False)
+
+    (options,args) = parser.parse_args()
+
+    if not args:
+        parser.print_help()
+        sys.exit(0)
+
+    processor.setOptions(options)
+
+    resultCode = processor.run(args)
+
+    sys.exit(resultCode)
+
