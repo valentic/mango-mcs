@@ -147,10 +147,10 @@ class Processor:
 
         print '[temp]'
         cpu = float(open('/sys/class/thermal/thermal_zone0/temp').read())/1000.
-        gpu = commands.getoutput('vcgencmd measure_temp')
-        gpu = float(gpu.split('=')[-1].split("'")[0])
+        #gpu = commands.getoutput('vcgencmd measure_temp')
+        #gpu = float(gpu.split('=')[-1].split("'")[0])
         print 'cpu: %s' % cpu
-        print 'gpu: %s' % gpu
+        #print 'gpu: %s' % gpu
 
         print '[Device]'
         print 'usb: %s' % self.usb('status')
