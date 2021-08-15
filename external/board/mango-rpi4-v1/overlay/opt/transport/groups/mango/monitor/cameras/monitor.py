@@ -20,6 +20,9 @@
 #               Make sure to clear prev_camera_config when off
 #               Add some debug log entries 
 #
+#   2021-08-12  Todd Valentic
+#               Add instrument name to output
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -248,6 +251,7 @@ class CameraMonitor(NightDataMonitorComponent):
 
         image_data.latitude = location['latitude']
         image_data.longitude = location['longitude']
+        image_data.instrument = self.name
 
         self.log.debug('image_data.bin_x: %s' % image_data.bin_x)
         self.log.debug('image_data.bin_y: %s' % image_data.bin_y)
@@ -257,7 +261,7 @@ class CameraMonitor(NightDataMonitorComponent):
 
     def write(self, output, timestamp, data):
 
-        version = 2
+        version = 3
 
         start_time = int(datefunc.datetime_as_seconds(data.start_time))
 
@@ -269,6 +273,7 @@ class CameraMonitor(NightDataMonitorComponent):
         output.write(struct.pack('!i',self.camera.camera_serial))
         output.write(struct.pack('!40s',self.camera.device_name))
         output.write(struct.pack('!40s',data.label))
+        output.write(struct.pack('!40s',data.instrument))
         output.write(struct.pack('!f',data.exposure_time))
         output.write(struct.pack('!i',data.x))
         output.write(struct.pack('!i',data.y))
