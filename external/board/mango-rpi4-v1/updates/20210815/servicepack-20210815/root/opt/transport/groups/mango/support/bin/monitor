@@ -1,0 +1,434 @@
+#!/usr/bin/env python
+
+########################################################################
+#
+#   Real-time status viewer
+#
+#   2021-04-16  Todd Valentic
+#               Initial implementation. Adapted from HBR monitor
+#
+#   2021-07-26  Todd Valentic
+#               Better handle return codes for sshlink status
+#
+#   2021-08-02  Todd Valentic
+#               Improve spacing in PDU table
+#
+#   2021-08-15  Todd Valentic
+#               Add temperatures 
+#
+########################################################################
+
+import os
+import sys
+import curses
+import curses.ascii
+import argparse
+import commands
+import socket
+import ConfigParser
+import StringIO
+import time
+import datetime
+import directory
+import ephem
+import pytz
+
+socket.setdefaulttimeout(10)
+
+enableLabel = ['--','On']
+alarmLabel  = ['--','On']
+
+def dd2dms(deg): 
+    d = int(deg)
+    md = abs(deg-d)*60
+    m = int(md)
+    sd = (md-m)*60
+    return '%4d %2d\' %2d"' % (d,m,sd) 
+
+def computeSolarAngle(location):
+    
+    station = ephem.Observer()
+    station.lat = str(location['latitude'])
+    station.lon = str(location['longitude'])
+    station.horizon = '-18'
+    station.date = ephem.now() 
+
+    sun = ephem.Sun()
+    sun.compute(station)
+    solarAngle = float(sun.alt)*180/ephem.pi
+
+    try:
+        sunset = station.next_setting(sun, use_center=True)
+        sunset = sunset.datetime().replace(tzinfo=pytz.utc)
+        sunset = sunset.strftime('%H:%M UTC')
+    except ephem.AlwaysUpError:
+        sunset = 'Always up'
+    except ephem.NeverUpError:
+        sunset = 'Never up'
+
+    try:
+        sunrise = station.next_rising(sun, use_center=True)
+        sunrise = sunrise.datetime().replace(tzinfo=pytz.utc)
+        sunrise = sunrise.strftime('%H:%M UTC')
+    except ephem.AlwaysUpError:
+        sunrise = 'Always up'
+    except ephem.NeverUpError:
+        sunrise = 'Never up'
+
+    return dict(
+        angle = solarAngle,
+        next_rise = sunrise,
+        next_set = sunset
+    )
+
+class InterfaceStat: 
+
+    def __init__(self, name):
+        self.name = name
+        self.tx_bytes = 0 
+        self.rx_bytes = 0
+        self.tx_rate = 0
+        self.rx_rate = 0
+        self.timestamp = None 
+
+    def update(self, timestamp, tx_bytes, rx_bytes):
+
+        if self.timestamp:
+
+            elapsed = (timestamp - self.timestamp).total_seconds()
+
+            self.tx_rate = self.compute_rate(elapsed, self.tx_bytes, tx_bytes)
+            self.rx_rate = self.compute_rate(elapsed, self.rx_bytes, rx_bytes)
+
+        self.tx_bytes = tx_bytes
+        self.rx_bytes = rx_bytes
+        self.timestamp = timestamp
+ 
+    def compute_rate(self, elapsed, prev_bytes, cur_bytes): 
+
+        if elapsed>0.01:
+            return max(0,cur_bytes-prev_bytes)/elapsed/1024 # kpbs
+        else:
+            return 0
+
+class Monitor:
+
+    def __init__(self,win,args):
+
+        self.win        = win
+        self.args       = args 
+        self.selectShow = 'Tincan'
+
+        self.prevSystemStatus = None
+
+        self.interfaceStats = {}
+
+        for interface in ['eth0', 'eth1', 'wlan0']:
+            self.interfaceStats[interface] = InterfaceStat(interface)
+
+        while True:
+            try:
+                self.directory  = directory.Directory()
+                self.sbcctl     = self.directory.connect('sbcctl')
+                self.pductl     = self.directory.connect('pductl')
+                self.cache      = self.directory.connect('cache')
+                self.event      = self.directory.connect('event')
+                self.location   = self.directory.connect('location')
+                self.pdulist    = self.pductl.list()
+                break
+            except:
+                self.win.addstr(0,0,'Waiting for services...')
+                self.win.refresh()
+                time.sleep(10)
+
+        self.serialnum = socket.gethostname().split('.')[0].upper()
+
+        self.pduIndex = 0
+        self.pduNames = sorted(self.pdulist)
+        self.pduName  = self.pduNames[self.pduIndex]
+
+    def run(self):
+
+        self.win.timeout(1000)
+        self.update()
+
+        count=0
+
+        while True: 
+            c = self.win.getch()
+            if c==-1:
+                count+=1
+                if count>=self.args.rate:
+                    self.update()
+                    count=0
+            elif c==curses.ascii.ESC:
+                break
+            elif c==ord('t') or c==ord('T'):
+                self.selectShow = 'Tincan'
+            elif c==ord('n'):
+                self.pduIndex = (self.pduIndex+1) % len(self.pduNames)
+                self.pduName = self.pduNames[self.pduIndex]
+
+        self.win.erase()
+
+    def showFlag(self,x,y,label,flag,dependson=True,flagChar='*'):
+        if dependson and flag:
+            text = '['+flagChar+'] '+label
+        else:
+            text = '[ ] '+label
+
+        self.win.addstr(x,y,text)
+
+    def getTincanStatus(self):
+        return self.cache.get('tincan')
+
+    def queryLinkStatus(self, profile):
+        cmd = 'sshlink2.tincan -p %s status' % profile
+        status, output = commands.getstatusoutput(cmd)
+
+        if status == 0:
+            return output.split('(')[0].strip()
+        else:
+            return 'Unknown'
+
+    def getSSHLinkStatus(self):
+
+        return dict(
+            primary = self.queryLinkStatus('primary'),
+            backup  = self.queryLinkStatus('backup')
+            )
+
+    def getSystemStatus(self):
+        buffer = StringIO.StringIO(self.cache.get('system'))
+        status = ConfigParser.ConfigParser()
+        status.readfp(buffer)
+        return status
+
+    def showLocation(self):
+
+        x = 2 
+        y = 14 
+
+        location = self.location.best()
+
+        self.win.addstr(y,x,'%-16s' % 'Location',curses.A_UNDERLINE)
+
+        if not location:
+            self.win.addstr(y+1,x,'Waiting for data')
+            return
+
+        self.win.addstr(y+1,x,'Src: %11s' % location['src'])
+        self.win.addstr(y+2,x,'Lat: %11.6f' % location['latitude'])
+        self.win.addstr(y+3,x,'Lon: %11.6f' % location['longitude'])
+
+        sun = computeSolarAngle(location)
+
+        self.win.addstr(y+4,x,'Sun : %6.1f deg' % sun['angle'])
+        self.win.addstr(y+5,x,'Set :  %s' % sun['next_set']) 
+        self.win.addstr(y+6,x,'Rise:  %s' % sun['next_rise']) 
+
+    def showGPS(self):
+
+        x = 25 
+        y = 14 
+
+        self.win.addstr(y,x,'%-16s' % 'GPS',curses.A_UNDERLINE)
+
+        try:
+            data = self.cache.get('gps') 
+        except:
+            if self.args.devel:
+                data = dict(
+                    latitude=32.4352,
+                    longitude=-123.245,
+                    alt=18232.93,
+                    mode=3,
+                    sats=12
+                    )
+            else:
+                self.win.addstr(y+1,x,'Waiting for data')
+                return
+
+        self.win.addstr(y+1,x,'Lat: %11.6f' % data['latitude'])
+        self.win.addstr(y+2,x,'Lon: %11.6f' % data['longitude'])
+        self.win.addstr(y+3,x,'Alt: %9.0f m' % data['alt'])
+        self.win.addstr(y+4,x,'Fix: %d, Sats: %2d' % (data['mode'],data['sats_valid']))
+
+    def showTincan(self):
+
+        y = 3
+        x = 45
+
+        self.win.addstr(y,x,'%-30s' % 'Tincan Network',curses.A_UNDERLINE)
+
+        try:
+            tincan = self.getTincanStatus()
+            sshlink = self.getSSHLinkStatus()
+        except:
+            self.win.addstr(y+1,x,'Waiting for data')
+            return
+
+        checkin_pathname = '/etc/tincan/flags/checkin'
+
+        registered = os.path.exists('/etc/tincan/flags/registered')
+        pending = os.path.exists('/etc/tincan/flags/registered.pending')
+        checkin = os.path.exists(checkin_pathname)
+
+        if checkin:
+            ts = os.path.getmtime(checkin_pathname)
+            checkin_last = datetime.datetime.fromtimestamp(ts)
+            checkin_last_s = checkin_last.strftime('%Y-%m-%d %H:%M:%S')
+        else:   
+            checkin_last_s = '--'
+
+        status = 'Registered' if registered else 'Pending' if pending else 'Unknown'
+     
+        self.win.addstr(y+1,x,'Status:  %s' % status)
+        self.win.addstr(y+2,x,'Checkin: %s' % checkin_last_s) 
+        self.win.addstr(y+3,x,'SSH %s' % sshlink['primary']) 
+        self.win.addstr(y+4,x,'SSH %s' % sshlink['backup']) 
+
+    def getInterfaceBytes(self, data, interface, direction):
+        try:
+            return data.getfloat('Network','%s.%s.bytes' % (interface,direction))
+        except: 
+            return 0 
+
+    def getTimestamp(self, data):
+        timestr = data.get('System','timestamp')
+        return datetime.datetime.strptime(timestr, '%Y-%m-%d %H:%M:%S.%f')
+
+    def updateNetworkStat(self, data, interface):
+        timestamp = self.getTimestamp(data) 
+        tx_bytes = self.getInterfaceBytes(data, interface, 'tx')
+        rx_bytes = self.getInterfaceBytes(data, interface, 'rx')
+        
+        self.interfaceStats[interface].update(timestamp, tx_bytes, rx_bytes)
+
+    def printInterfaceStat(self, interface):
+        return '%-5s %6.1f kbps %6.1f kbps' % \
+            (interface.name, interface.tx_rate, interface.rx_rate)
+
+    def showSystem(self):
+
+        x = 45 
+        y = 14 
+
+        self.win.addstr(y,x,'%-30s' % 'System',curses.A_UNDERLINE)
+
+        try:
+            data = self.getSystemStatus()
+        except:
+            self.win.addstr(y+1,x,'Waiting for data')
+            return
+
+        if self.prevSystemStatus:
+            prevTime = self.prevSystemStatus.get('System','timestamp')
+            curTime = data.get('System','timestamp')
+
+            if prevTime != curTime:
+                for interface in self.interfaceStats:
+                    self.updateNetworkStat(data, interface)
+                self.prevSystemStatus = data
+            
+        else:
+            self.prevSystemStatus = data
+
+        release = data.get('Versions','release.version')
+        self.win.addstr(y,x+6,' - Release %s' % release, curses.A_UNDERLINE) 
+
+        uptime = round(data.getfloat('Uptime','seconds'))
+        uptime = datetime.timedelta(seconds=uptime)
+
+        diskused  = data.getfloat('/','usedpct')
+     
+        self.win.addstr(y+1,x,'Uptime: %s' % uptime) 
+        self.win.addstr(y+2,x,'Load  : %s' % data.getfloat('Load','1min'))
+        self.win.addstr(y+3,x,'Disk  : %.1f%% used' % diskused)
+
+        for k,zone in enumerate(sorted(data.options('Temperature'))):
+            temp_c = data.getfloat('Temperature',zone)
+            self.win.addstr(y+4+k,x,'Zone %d: %.1f C' % (k,temp_c))
+
+        y=9
+        self.win.addstr(y+0,x, '%-5s    %-8s    %-8s' % ('Device','Tx','Rx'), curses.A_UNDERLINE)
+        for k, name in enumerate(sorted(self.interfaceStats)): 
+            stat = self.interfaceStats[name]
+            self.win.addstr(y+k+1,x, self.printInterfaceStat(stat))
+
+    def showPDU(self):
+       
+        x = 2 
+        y = 3
+
+        label = 'PDU Power Rail  Device       Temp State' 
+        self.win.addstr(y,x,'%-39s' % label,curses.A_UNDERLINE)
+
+        try:
+            data = self.pductl.status(self.pduName)
+        except:
+            self.win.addstr(y+1,x,'Waiting for data')
+            return
+
+        for index,state in enumerate(data['RS']):
+            rail = index+1
+            outlet = 'Outlet %d' % rail 
+            device = self.pdulist[self.pduName]['rails'][str(rail)]['device']
+            label = self.pdulist[self.pduName]['rails'][str(rail)]['label']
+
+            try:
+                info = self.cache.get(device)
+                temp = '%5.1fC %5.5s' % (info['ccd_temp'], info['state'])
+            except:
+                temp = ''
+
+            desc = '%-11.11s %-10.10s %s' % (outlet, label, temp)
+            self.showFlag(y+rail,x,desc,state=='on',flagChar='*')
+
+    def update(self):
+
+        self.win.addstr(1,1,'*')
+        self.win.move(curses.LINES-2,curses.COLS-2)
+        self.win.refresh()
+            
+        self.win.addstr(1,1,' ')
+        self.win.move(curses.LINES-2,curses.COLS-2)
+        self.win.refresh()
+
+        self.win.erase()
+
+        self.win.addstr(1,2,'System Monitor (%s - %s)' % (self.serialnum,self.pduName))
+
+        now = datetime.datetime.now()
+        timestr = now.strftime('%Y-%m-%d %H:%M:%S UTC')
+        self.win.addstr(1,52,timestr)
+
+        self.showPDU()
+        self.showLocation()
+        self.showGPS()
+        self.showSystem()
+        self.showTincan()
+
+        self.win.addstr(curses.LINES-1,2,'ESC - exit') 
+        self.win.move(curses.LINES-2,curses.COLS-2)
+        self.win.refresh()
+
+def main(win,args):
+    Monitor(win,args).run()
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='System Monitor')
+
+    parser.add_argument('-r','--rate',type=int,
+                        metavar='SECS',
+                        default='1',
+                        help='sample rate in secs (default 1)')
+
+    parser.add_argument('-d','--devel',action='store_true',
+                        help='Simulate sources during testing')
+
+    args = parser.parse_args()
+
+    curses.wrapper(main,args)
+
