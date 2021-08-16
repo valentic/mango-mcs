@@ -416,14 +416,15 @@ class PDU_webpowerswitch(PDUBase):
         interface = HTTPInterface(addr,auth=auth,scheme=scheme)
         super(PDU_webpowerswitch,self).__init__(interface,'webpowerswitch',**args)
 
-        exp = 'center>(\d)</td><td>([^<]+)</td>\S+<font \S+>(\S+)</font>'
+        #exp = 'center>(\d)</td><td>([^<]+)</td>\S+<font \S+>(\S+)</font>'
+        exp = '<div id="state">(.+?)</div>'
         self.pattern = re.compile(exp)
 
         self.setDataMap({
             'RS':   self.RS
             })
 
-    def RS(self):
+    def RS_old(self):
         page = self.sendCommand('index.htm').replace('\n','')
 
         outlets = {} 
@@ -435,6 +436,22 @@ class PDU_webpowerswitch(PDUBase):
         for outlet in range(1,9):
             values.append(outlets[outlet])
 
+        self.data['RS'] = values 
+        return values
+
+    def RS(self):
+        page = self.sendCommand('status')
+
+        values = []
+
+        state = int(self.pattern.findall(page)[0],16)
+
+        for k in range(8): 
+            if state & 2**k:
+                values.append('on')
+            else:
+                values.append('off')
+        
         self.data['RS'] = values 
         return values
 
