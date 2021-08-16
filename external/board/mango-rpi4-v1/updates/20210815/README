@@ -8,6 +8,7 @@ Online system update for mango-rpi4-v1
     - Add mdiotool to control Ethernet port LEDs
     - Add scripts to control onboard LEDs 
     - Add temperature monitoring
+    - Use legacy interface for powerswitch
     - Release 1.7 
 
 
