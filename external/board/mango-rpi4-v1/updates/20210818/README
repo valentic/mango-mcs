@@ -1,0 +1,11 @@
+==========================================================================
+20210818  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Make status check more robust in camera monitor 
+    - Don't exit on error in relay inbound 
+    - Release 1.8 
+
+
