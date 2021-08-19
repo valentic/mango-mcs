@@ -23,6 +23,9 @@
 #   2021-08-12  Todd Valentic
 #               Add instrument name to output
 #
+#   2021-08-17  Todd Valentic
+#               Protect status call in isOn()
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -104,7 +107,10 @@ class CameraMonitor(NightDataMonitorComponent):
 
     def isOn(self):
         status = self.getStatus()
-        return status.get('device',self.name)=='on'
+        try:
+            return status.get('device',self.name)=='on'
+        except:
+            return False
 
     def startup(self):
         
