@@ -1,0 +1,11 @@
+==========================================================================
+20210922  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add retry logic to pductl service 
+    - Clear camera parameter cache on restart in camera monitor 
+    - Release 1.10 
+
+
