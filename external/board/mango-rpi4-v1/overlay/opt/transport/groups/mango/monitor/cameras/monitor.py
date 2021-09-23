@@ -26,6 +26,9 @@
 #   2021-08-17  Todd Valentic
 #               Protect status call in isOn()
 #
+#   2021-09-22  Todd Valentic
+#               Reset settings cache when connecting to camera
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -131,6 +134,8 @@ class CameraMonitor(NightDataMonitorComponent):
 
         self.camera = self.manager.connect_camera(self.name)
         self.camera.open()
+        self.camera_config = None
+        self.prev_camera_config = None
 
         self.log.info('Connected to camera')
 
