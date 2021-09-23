@@ -176,8 +176,11 @@ class CameraDevice:
 
         # Wait until image is ready to download
 
+        deadline = time.time()+30
         while not self.image_ready():
             time.sleep(0.1)
+            if time.time() > deadline:
+                raise IOError('Camera timeout')
 
         now = datetime.datetime.utcnow()
         total_capture_time = (now - start_time).total_seconds()
@@ -477,11 +480,19 @@ class CameraController:
 
 
 if __name__ == '__main__':
+
+    import struct
+
+    if len(sys.argv)==2:
+        exposure_time = float(sys.argv[1])
+    else:
+        exposure_time = 0.001
         
     controller = CameraController()
 
     print('API Version: %s' % controller.api_version)
     print('DLL Version: %s' % controller.dll_version)
+    print('Exposure   : %s' % exposure_time)
 
     devices = controller.scan_for_cameras()
 
@@ -505,11 +516,12 @@ if __name__ == '__main__':
 
         end = datetime.datetime.utcnow() + datetime.timedelta(seconds=60)
 
+        deadline = time.time()+30
         while camera.get_temperature() > -4: 
             print('  CCD temp     : %.1fC' % camera.get_temperature())
             time.sleep(5)
-
-        exposure_time = 10
+            if time.time() > deadline:
+                break
 
         print('Taking image (%s secs)' % exposure_time)
         image_data = camera.capture_image(exposure_time)
@@ -518,12 +530,18 @@ if __name__ == '__main__':
         print('  - capture time: %s' % image_data.capture_time)
         print('  - buffer: %s' % type(image_data.image_buffer))
 
+        with open('/tmp/tmp.dat','w') as output:
+            output.write(struct.pack('!%dH' % image_data.image_size, *image_data.image_buffer))
+
         print('Warm up camera')
         camera.warmup()
 
+        deadline = time.time()+30
         while camera.get_temperature() < 20: 
             print('  CCD temp     : %.1fC' % camera.get_temperature())
             time.sleep(5)
+            if time.time() > deadline:
+                break
 
     for camera in cameras:
         camera.close()
