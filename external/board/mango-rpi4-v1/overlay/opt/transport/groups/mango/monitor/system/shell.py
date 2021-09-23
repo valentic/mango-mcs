@@ -14,6 +14,10 @@
 #               Add tincan
 #               Remove TS7250status for mango systems
 #
+#   2021-09-17  Todd Valentic
+#               Add restart monitor
+#               Add log monitor
+#
 ####################################################################
 
 import sys
@@ -24,6 +28,8 @@ from systemmonitor      import SystemMonitor
 from schedulemonitor    import ScheduleMonitor
 from watchdogmonitor    import WatchdogMonitor
 from tincanmonitor      import TincanMonitor
+from restartmonitor     import RestartMonitor
+from logmonitor         import LogMonitor
 
 class DataMonitorShell(ProcessClient):
 
@@ -43,6 +49,8 @@ class DataMonitorShell(ProcessClient):
             'schedule': ScheduleMonitor,
             'watchdog': WatchdogMonitor,
             'tincan':   TincanMonitor,
+            'restart':  RestartMonitor,
+            'log':      LogMonitor,
             }
 
         if id in map:
