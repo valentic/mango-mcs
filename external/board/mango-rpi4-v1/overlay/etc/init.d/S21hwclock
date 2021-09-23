@@ -7,6 +7,9 @@
 #   2021-07-21  Todd Valentic
 #               Initial implementation
 #
+#   2021-09-21  Todd Valentic
+#               Fix typo at end of case statement (exit 0 in wrong place).
+#
 ##########################################################################
 
 [ ! -x /sbin/hwclock ] && exit 0
@@ -56,5 +59,6 @@ case "$1" in
         exit 1
         ;;
 
-    exit 0
 esac
+
+exit 0
