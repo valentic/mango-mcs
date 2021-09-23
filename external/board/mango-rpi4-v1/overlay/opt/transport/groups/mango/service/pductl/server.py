@@ -19,6 +19,9 @@
 #   2019-07-02  Todd Valentic
 #               Support new PDU models (small payload)
 #
+#   2021-09-22  Todd Valentic
+#               Add support for command retries
+#
 ###################################################################
 
 from Transport  import ProcessClient
@@ -94,11 +97,13 @@ class PDUConfig(ConfigComponent):
     def __init__(self,name,parent):
         ConfigComponent.__init__(self,'pdu',name,parent)
 
-        self.model  = self.get('model','v2')
-        self.addr   = self.get('addr')
-        self.auth   = self.get('auth')
-        self.scheme = self.get('scheme')
-        self.rails  = self.getComponentsDict('rails',Rail)
+        self.model      = self.get('model','v2')
+        self.addr       = self.get('addr')
+        self.auth       = self.get('auth')
+        self.scheme     = self.get('scheme')
+        self.maxRetries = self.getint('retry.max',3)
+        self.retryWait  = self.getDeltaTime('retry.wait',2)
+        self.rails      = self.getComponentsDict('rails',Rail)
 
         args = dict(
             model   = self.model,
@@ -115,15 +120,21 @@ class PDUConfig(ConfigComponent):
 
         self.log.debug('%s %s' % (cmd,args))
 
-        with self.pdu as pdu:
-            try:
-                func = getattr(pdu,cmd)
-                output = func(*args)
-            except:
-                self.log.exception('error for cmd %s' % cmd)
-                raise
+        retryCount = 0
 
-        return output
+        while retryCount <= self.maxRetries and self.running:
+
+            with self.pdu as pdu:
+                try:
+                    func = getattr(pdu,cmd)
+                    return func(*args)
+                except:
+                    self.log.exception('error for cmd %s' % cmd)
+                    retryCount += 1
+
+            self.wait(self.retryWait)
+
+        raise IOError('Timeout running %s' % cmd)
 
     def asDict(self):
 
