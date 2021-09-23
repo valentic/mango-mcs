@@ -1,0 +1,8 @@
+/var/log/ufw.log {
+    missingok
+    notifempty
+    rotate 4
+    size 100k 
+    create
+    su root root
+}

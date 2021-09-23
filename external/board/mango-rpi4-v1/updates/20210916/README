@@ -1,0 +1,16 @@
+==========================================================================
+20210916  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add timeout to camera sampling 
+    - Reboot system every week (fix monthly camera lockup) 
+    - Allow for 10-second image offload in camera schedules
+    - Add logrotate config for uwf 
+    - Modify logrotate config for var
+    - Capture log files
+    - Fix hwclock init script
+    - Release 1.9 
+
+

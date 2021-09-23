@@ -1,0 +1,64 @@
+#!/bin/sh
+
+##########################################################################
+#
+#   Set the system time from an attached RTC hardware clock. 
+#
+#   2021-07-21  Todd Valentic
+#               Initial implementation
+#
+#   2021-09-21  Todd Valentic
+#               Fix typo at end of case statement (exit 0 in wrong place).
+#
+##########################################################################
+
+[ ! -x /sbin/hwclock ] && exit 0
+
+if [ -x /etc/default/hwclock ]; then
+    . /etc/default/hwclock
+fi
+
+[ "$UTC" = yes ] && UTC=-u || UTC=-l
+
+if  [ ! -z "$HWCLOCKDEVICE" ]; then
+	if [ -e $HWCLOCKDEVICE ]; then
+		DEVICE="-f $HWCLOCKDEVICE"
+	fi
+fi
+
+case "$1" in
+    start)
+        echo "Setting the system clock from the hardware clock."
+
+        if [ "$HWCLOCKACCESS" != no ]; then
+			if [ -z "$TZ" ]; then
+                hwclock -s $UTC $DEVICE
+            else
+				TZ="$TZ" hwclock -s $UTC $DEVICE
+			fi
+		fi
+
+        echo "System time is now `date`."
+        ;;
+
+    stop|restart|reload|force-reload)
+        echo "Saving the system clock time to the hardware clock."
+		if [ "$HWCLOCKACCESS" != no ]; then
+			hwclock -w $UTC $DEVICE
+		fi
+        ;;
+
+	show)
+		if [ "$HWCLOCKACCESS" != no ]; then
+			hwclock $UTC $DEVICE
+		fi
+		;;
+
+    *)
+        echo "Usage: hwclock.sh {start|stop|show|reload|restart}" >&2
+        exit 1
+        ;;
+
+esac
+
+exit 0
