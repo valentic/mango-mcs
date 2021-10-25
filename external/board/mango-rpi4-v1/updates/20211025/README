@@ -1,0 +1,11 @@
+==========================================================================
+20211025  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Update gpsd to version 3.23.1. Fixes rollover bug [1] 
+    - Release 1.11
+
+[1] https://us-cert.cisa.gov/ncas/current-activity/2021/10/21/gps-daemon-gpsd-rollover-bug
+
