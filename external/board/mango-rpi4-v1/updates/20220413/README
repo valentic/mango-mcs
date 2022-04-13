@@ -1,0 +1,10 @@
+==========================================================================
+20220413  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Restart mango camera monitor on error instead of exit 
+    - Release 1.13 
+
+
