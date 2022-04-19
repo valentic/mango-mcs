@@ -1,0 +1,15 @@
+==========================================================================
+20220418  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Update busybox to remove "-n" option from udhcpc. An initial set
+      of options are hardcoded from the config file. The -n option will
+      cause udhcpc to exit if a lease is not obtained. We do not want
+      this behavior. We want to continue trying, otherwise the network
+      will never come up until we restart.
+    - Check minutes instead of days for exchange-watchdog
+    - Release 1.15 
+
+
