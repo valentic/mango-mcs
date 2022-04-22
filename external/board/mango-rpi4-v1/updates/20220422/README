@@ -1,0 +1,10 @@
+==========================================================================
+20220422  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add savelogs service (the rc.d file was missing from v1.14)
+    - Release 1.16 
+
+
