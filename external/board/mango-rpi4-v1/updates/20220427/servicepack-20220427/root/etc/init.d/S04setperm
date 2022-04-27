@@ -1,0 +1,36 @@
+#!/bin/sh
+
+##########################################################################
+#
+#   Make sure the permission and ownership of some files are set correctly
+#
+#   2022-04-27  Todd Valetic
+#               Initial implementation.
+##########################################################################
+
+SRCPATH=/transmit/inbound/updates
+WORKDIR=/transmit/inbound/updates.working
+LOGPATH=/transmit/outbound/updates
+LOGFILE=`date +"$LOGPATH/updates-%Y%m%d-%H%M%S"`
+
+start() {
+    echo "Checking file ownership/permissions"
+
+    if [ -d /transmit ]; then
+        chown -R transport:transport /transmit
+    fi
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    ;;
+  *)
+    echo "Usage: $0 {start|stop}"
+    exit 1
+    ;;
+esac
+
+exit 0
