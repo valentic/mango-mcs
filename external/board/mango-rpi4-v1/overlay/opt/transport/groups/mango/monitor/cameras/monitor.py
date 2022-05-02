@@ -34,6 +34,7 @@
 #
 #   2022-05-02  Todd Valentic
 #               Use image timestamp for sampleTime
+#               Shutdown on timeout (results in a restart)
 #
 ###################################################################
 
@@ -283,6 +284,7 @@ class CameraMonitor(NightDataMonitorComponent):
             image_data = self.camera.capture_image(self.exposure_time) 
         except:
             self.log.exception('Problem capturing image')
+            self.shutdown()
             return None
 
         summary = '%.1fs / %.1fs / %.0fKB / %.1fC' % (
