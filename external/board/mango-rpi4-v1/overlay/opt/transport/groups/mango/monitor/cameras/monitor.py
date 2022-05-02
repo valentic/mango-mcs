@@ -32,6 +32,9 @@
 #   2022-04-18  Todd Valentic
 #               Set/clear keepalive flag
 #
+#   2022-05-02  Todd Valentic
+#               Use image timestamp for sampleTime
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -300,6 +303,8 @@ class CameraMonitor(NightDataMonitorComponent):
         self.log.debug('image_data.bin_x: %s' % image_data.bin_x)
         self.log.debug('image_data.bin_y: %s' % image_data.bin_y)
         self.log.debug('image_data.label: %s' % image_data.label)
+
+        self.sampleTime = image_data.start_time
 
         return image_data 
 

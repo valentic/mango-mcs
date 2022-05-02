@@ -96,6 +96,9 @@
 #   2021-07-14  Todd Valentic
 #               Use time at sample start for file timestamp
 #
+#   2022-05-02  Todd Valentic
+#               Add sampleTime property
+#
 ##################################################################
 
 from Transport import ProcessClient
@@ -133,6 +136,7 @@ class DataMonitorMixin(DirectoryMixin,ResourceMixin):
         self.schedules      = schedule.ScheduleManager(self.log)
         self.curSchedule    = None
         self.on             = False
+        self._sampleTime    = None
 
         self.outputenabled  = self.getboolean('output.enabled',True)
         self.outputrate	    = self.getDeltaTime('output.rate')
@@ -340,13 +344,27 @@ class DataMonitorMixin(DirectoryMixin,ResourceMixin):
         """Can be filled in by child classes for a time derived by the data."""
         return time.time()
 
+    def setSampleTime(self, timestamp):
+        self._sampleTime = timestamp
+
+    @property
+    def sampleTime(self):
+        # Unix timestamp
+        return self._sampleTime
+
+    @property.setter
+    def sampleTime(self, timestamp):
+        if isinstance(timestamp, datetime.datetime):
+            timestamp = time.mktime(timestamp.timetuple())
+        self._sampleTime = timestamp
+
     def samplingCycle(self):
 
         try:
-            sample_time = time.time()
+            self.sampleTime = time.time()
             data = self.sample()
             if data is not None and self.outputenabled:
-                self.saveData(sample_time,data)
+                self.saveData(self.sampleTime,data)
                 self.compressFile()
         except:
             self.log.exception('Failed to collect data')
