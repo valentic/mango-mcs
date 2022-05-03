@@ -352,7 +352,7 @@ class DataMonitorMixin(DirectoryMixin,ResourceMixin):
         # Unix timestamp
         return self._sampleTime
 
-    @property.setter
+    @sampleTime.setter
     def sampleTime(self, timestamp):
         if isinstance(timestamp, datetime.datetime):
             timestamp = time.mktime(timestamp.timetuple())
