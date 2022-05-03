@@ -97,7 +97,7 @@
 #               Use time at sample start for file timestamp
 #
 #   2022-05-02  Todd Valentic
-#               Add sampleTime property
+#               Add sampleTime get/set 
 #
 ##################################################################
 
@@ -344,16 +344,11 @@ class DataMonitorMixin(DirectoryMixin,ResourceMixin):
         """Can be filled in by child classes for a time derived by the data."""
         return time.time()
 
-    def setSampleTime(self, timestamp):
-        self._sampleTime = timestamp
-
-    @property
-    def sampleTime(self):
+    def getSampleTime(self):
         # Unix timestamp
         return self._sampleTime
 
-    @sampleTime.setter
-    def sampleTime(self, timestamp):
+    def setSampleTime(self, timestamp):
         if isinstance(timestamp, datetime.datetime):
             timestamp = time.mktime(timestamp.timetuple())
         self._sampleTime = timestamp
@@ -361,10 +356,10 @@ class DataMonitorMixin(DirectoryMixin,ResourceMixin):
     def samplingCycle(self):
 
         try:
-            self.sampleTime = time.time()
+            self.setSampleTime(time.time())
             data = self.sample()
             if data is not None and self.outputenabled:
-                self.saveData(self.sampleTime,data)
+                self.saveData(self.getSampleTime(),data)
                 self.compressFile()
         except:
             self.log.exception('Failed to collect data')

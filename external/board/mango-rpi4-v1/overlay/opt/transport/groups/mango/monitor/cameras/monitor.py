@@ -306,7 +306,7 @@ class CameraMonitor(NightDataMonitorComponent):
         self.log.debug('image_data.bin_y: %s' % image_data.bin_y)
         self.log.debug('image_data.label: %s' % image_data.label)
 
-        self.sampleTime = image_data.start_time
+        self.setSampleTime(image_data.start_time)
 
         return image_data 
 
