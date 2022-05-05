@@ -36,6 +36,9 @@
 #               Use image timestamp for sampleTime
 #               Shutdown on timeout (results in a restart)
 #
+#   2022-05-05  Todd Valentic
+#               Shutdown if problem connecting to camera
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -137,6 +140,9 @@ class CameraMonitor(NightDataMonitorComponent):
 
     def set_flag(self, filename):   
 
+        if not filename:
+            return
+
         filepath = os.path.split(os.path.abspath(filename))[0]
 
         if not os.path.isdir(filepath):
@@ -152,7 +158,7 @@ class CameraMonitor(NightDataMonitorComponent):
 
     def clear_flag(self, filename):
 
-        if os.path.exists(filename):
+        if filename and os.path.exists(filename):
             self.log.info('Clearing keepalive flag')
             os.remove(filename)
 
@@ -160,14 +166,20 @@ class CameraMonitor(NightDataMonitorComponent):
 
         self.setResources('%s=on' % self.name)
 
-        if self.keepalive_flag:
-            self.set_flag(self.keepalive_flag)
+        self.set_flag(self.keepalive_flag)
 
         # Wait for device to come online
         self.wait(5)
 
-        self.camera = self.manager.connect_camera(self.name)
-        self.camera.open()
+        try:
+            self.camera = self.manager.connect_camera(self.name)
+            self.camera.open()
+        except:
+            self.log.exception('Problem connecting to camera')
+            self.clear_flag(self.keepalive_flag)
+            self.clearResources()
+            return
+
         self.camera_config = None
         self.prev_camera_config = None
 
@@ -199,9 +211,8 @@ class CameraMonitor(NightDataMonitorComponent):
             self.camera = None
             self.camera_config = None
             self.prev_camera_config = None
-
-        if self.keepalive_flag:
-            self.clear_flag(self.keepalive_flag)
+            
+        self.clear_flag(self.keepalive_flag)
 
         self.clearResources()
 
