@@ -16,10 +16,8 @@ def camera_info():
         return None
     elif len(devices)>1:
         return None
-    else:
-        device = devices[0]
 
-    return controller.get_device_serial(device)
+    return devices.values()[0]
 
 if __name__ == '__main__':
 
@@ -27,8 +25,10 @@ if __name__ == '__main__':
     resources = directory.connect('resources')
     pductl = directory.connect('pductl')
 
+    names = ['redline', 'greenline', 'camera_a', 'camera_b', 'camera_c', 'camera_d']
+
     device_state = pductl.getDeviceState()
-    camera_names = [name for name in device_state if name.startswith('camera_')]
+    camera_names = [name for name in device_state if name in names]
 
     cameras_on = [name for name in device_state if device_state[name]=='on'] 
 
