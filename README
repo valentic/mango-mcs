@@ -9,7 +9,7 @@ Introduction
 --------------------------------------------------------------------------
 
 These are the board specific files for the embedded camera system of the 
-MANGO project (www.mangonetwork.org). The accompany the buildroot tool to
+MANGO project (www.mangonetwork.org). They accompany the buildroot tool to
 automate the process of building firmware images.
 
 See the INSTALL file for details on how to build the images.
