@@ -9,7 +9,7 @@ Embedded Data Transport System Build
 Introduction
 --------------------------------------------------------------------------
 
-This package builds the disk image for a remote data transport ssytem. It
+This package builds the disk image for a remote data transport sytem. It
 uses the buildroot tool to manage the process, starting with building a
 toolchain with a compiler and libraries for cross complilation followed
 by the Linux kernel and user space tools to create a small but fully
