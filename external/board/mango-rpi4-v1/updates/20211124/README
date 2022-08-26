@@ -1,0 +1,10 @@
+==========================================================================
+20211124  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Update pdulib.py to support Digital Logger REST API 
+    - Release 1.12
+
+

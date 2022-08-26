@@ -1,0 +1,2 @@
+OUTPUTDIR=/transmit/outbound/syslog
+OWNER=transport

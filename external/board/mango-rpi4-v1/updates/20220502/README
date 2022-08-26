@@ -1,0 +1,12 @@
+==========================================================================
+20220502  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add sampleTime property to DataMonitor 
+    - Use image time for sampleTime 
+    - Restart camera on timeout
+    - Release 1.18 
+
+

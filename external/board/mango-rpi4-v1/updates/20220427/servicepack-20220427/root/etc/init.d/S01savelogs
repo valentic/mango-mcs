@@ -1,0 +1,78 @@
+#!/bin/bash
+
+##########################################################################
+#   Save a copy of the system log files
+#
+#   The system log files are kept on a RAM disk to minimize the number
+#   writes to the file system on the SD card. These logs are lost on a
+#   reboot and unavailable to help diagnose problems later on. This script
+#   will stores a copy of the logs on a clean system exit/reboot. The logs 
+#   will only be kept if there is sufficient disk space. 
+#
+#   2022-04-18  Todd Valentic
+#               Initial implementation
+#
+#   2022-04-27  Todd Valentic
+#               Set owner of output files
+#
+##########################################################################
+
+set -o errexit  # abort on nonzero exitstatus
+set -o nounset  # abort on unbound variables
+set -o pipefail # do not hide errors within pipes
+
+DAEMON="savelogs"
+MINFREE_KB=1000
+OUTPUTDIR=/root
+OWNER=root
+
+[ -r "/etc/default/$DAEMON" ] && . "/etc/default/$DAEMON"
+
+start() {
+	return "0"
+}
+
+stop() {
+	printf 'Stopping %s: ' "$DAEMON"
+
+    local TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+    local FREESPACE=$(df -k $OUTPUTDIR | tail -n1 | awk '{print $4}')
+
+    if [ "$FREESPACE" -lt "$MINFREE_KB" ]; then
+         echo "No free space"
+         return "1"
+    fi
+
+    if [ ! -d "$OUTPUTDIR" ]; then
+        mkdir -p $OUTPUTDIR
+    fi
+
+    local OUTPUTFILE=$OUTPUTDIR/syslogs-$TIMESTAMP.tgz 
+    tar zcf $OUTPUTFILE -C /var/log messages
+
+	status=$?
+
+    chown --quiet $OWNER:$OWNER $OUTPUTFILE
+
+	if [ "$status" -eq 0 ]; then
+		echo "OK"
+	else
+		echo "FAIL"
+	fi
+
+	return "$status"
+}
+
+restart() {
+	stop
+	sleep 1
+	start
+}
+
+case "$1" in
+	start|stop|restart)
+		"$1";;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+esac

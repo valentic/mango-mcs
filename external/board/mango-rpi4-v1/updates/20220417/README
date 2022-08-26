@@ -1,0 +1,16 @@
+==========================================================================
+20220417  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add eth1 to ifplugd interface list
+    - Remove dangling "}" in default wpa_supplicant.conf 
+    - Add flag directory check to exchange_watchdog
+    - Set keepalive flag in camera monitor to prevent restart during 
+      data collection
+    - Add S01savelogs service
+    - Add syslog to file relay
+    - Release 1.14 
+
+

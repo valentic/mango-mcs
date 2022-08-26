@@ -1,0 +1,75 @@
+#!/bin/bash
+
+#####################################################################
+#
+#   Watchdog
+#
+#   Check the exchange flag to see if we have had successful
+#   connections back to the news server. If the flag is missing
+#   or older than one day, reboot the system.
+#
+#   2008-08-28  Todd Valentic
+#               Initial implementation.
+#
+#   2008-11-17  Todd Valentic
+#               Renamed from failsafe-reboot to failsafe-watchdog
+#
+#   2013-12-18  Todd Valentic
+#               Change timeout (DAYS) to 0 => 1 day wait
+#
+#   2021-07-17  Todd Valentic
+#               Change name to exchange-watchdog to better reflect
+#                   what we are checking
+#               Use exchange-watchdog for logger tag
+#               Add /etc/exchange-watchdog.confg file
+#
+#   2022-04-17  Todd Valentic
+#               Check multiple keep alive flags in /tmp/keepalive.d 
+#
+#####################################################################
+
+NAME=$(basename $BASH_SOURCE)
+KEEPALIVEFLAG=/tmp/keepalive
+KEEPALIVEDIR=/tmp/keepalive.d
+EXCHANGEFLAG=/etc/tincan/flags/checkin
+DAYS=0
+
+if [ -f $CONFIGFILE ]; then
+    . $CONFIGFILE
+fi
+
+RebootSystem() {
+    logger -t $NAME "Rebooting system"
+    sudo /sbin/reboot
+    sleep 10
+    exit 0
+}
+
+if [ -f $KEEPALIVEFLAG ]; then
+	logger -t $NAME "Keepalive flag exists, skipping"
+	exit 0
+fi
+
+if [ -d $KEEPALIVEDIR ]; then
+    if [ "$(ls -A $KEEPALIVEDIR)" ]; then
+        logger -t $NAME "Keepalive flags found, skipping"
+        exit 0
+    fi
+fi
+
+if [ ! -f $EXCHANGEFLAG ]; then
+    logger -t $NAME "Exchange flag missing"
+    RebootSystem
+fi
+
+STALEFILES=`find $EXCHANGEFLAG -mtime +$DAYS -print`
+
+if [ $STALEFILES ]; then
+    logger -t $NAME "Found stale exchange flag"
+    RebootSystem
+fi
+
+logger -t $NAME "Exchange flag is still current"
+
+exit 0
+

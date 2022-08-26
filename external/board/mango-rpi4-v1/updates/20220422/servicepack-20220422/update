@@ -1,0 +1,41 @@
+#!/bin/sh
+
+######################################################################
+#
+# Service Pack mango-rpi4-v1 20220422
+#
+######################################################################
+
+echo "====================== SYSTEM UPDATE ==========================="
+echo "Date:" `date`
+echo "Service pack: mango-rpi4-v1 20220422"
+
+echo "Setting file ownsership"
+
+if [ -d root ]; then
+    chown -R root:root root/.
+fi
+
+if [ -d root/opt/transport ]; then
+    chown -R transport:transport root/opt/transport/groups
+fi
+
+if [ -d root/transmit ]; then
+    chown -R transport:transport root/transmit
+fi
+
+echo "Listing new files"
+ls -lR root
+
+echo "Copying files"
+cp -fa root/. /
+
+echo "----------------------------------------------------------------"
+echo "Update finished"
+echo "----------------------------------------------------------------"
+
+echo "Rebooting"
+/sbin/reboot
+sleep 10
+
+

@@ -1,0 +1,11 @@
+==========================================================================
+20220427  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Set ownership/permission of /transmit/outbout/syslog
+    - Make sure syslog sets ownsership 
+    - Release 1.17 
+
+
