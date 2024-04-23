@@ -1,0 +1,12 @@
+==========================================================================
+20230508  System Update - BDR only
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add Netgear M1 reboot script 
+    - Reboot router only 
+   
+This is a fast patch to attempt to get the BDR systems back online.
+
+
