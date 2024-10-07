@@ -1,0 +1,47 @@
+#!/bin/sh
+
+##########################################################################
+#
+#   Reboot the Netgear router if present 
+#   
+#   The Netgear M1 MiFi router stops working after a few weeks. This
+#   appears to be a known issue if it is just sitting there and
+#   sending data. The work around is to the reboot it. We do that 
+#   here so it will done as part of the weekly reboot. 
+#   
+#   https://github.com/mtreinik/netgear-m1
+#
+#   2023-05-08  Todd Valentic
+#               Initial implementation
+#
+##########################################################################
+
+[ ! -x /usr/local/bin/netgear-m1.sh ] && exit 0
+
+if [ -x /etc/default/netgear ]; then
+    . /etc/default/netgear
+fi
+
+if [ "$(hostname -s)" != "bdr" ]; then
+    # Only apply to BDR site
+    exit 0
+fi
+
+case "$1" in
+    start|restart)
+        echo "Rebooting Netgear router."
+
+        echo MANGO | timeout -s 9 60 /usr/local/bin/netgear-m1.sh reboot
+        ;;
+
+    stop)
+        ;;
+
+    *)
+        echo "Usage: S42netgear {start|stop|restart}" >&2
+        exit 1
+        ;;
+
+esac
+
+exit 0

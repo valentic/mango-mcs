@@ -1,0 +1,11 @@
+==========================================================================
+20241007  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add relay watchdog 
+    - Set power outlet #5 for router 
+    - Add router device and resource
+
+
