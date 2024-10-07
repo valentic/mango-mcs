@@ -20,6 +20,9 @@
 #               Add serialNum option
 #               Use path, filename, pathname nomenclature
 #
+#   2024-10-06  Todd Valentic
+#               Update flag file timestamp on successful post
+#
 ############################################################################
 
 from Transport      import ProcessClient
@@ -55,12 +58,18 @@ class FileGroup(ConfigComponent, NewsPostMixin):
         self.enableParseTime = self.getboolean('parseTime',True)
         self.enableSerialNum = self.getboolean('serialNum',False)
 
+        self.flagfile       = self.get('flagfile','relay')
+
         self.pathRule       = PatternTemplate('path','/')
 
         self.newsgroupTemplate = self.get('post.newsgroup.template')
 
         self.posters        = {}
         self.timeFilename   = '%s.timestamp' % name
+
+        flagdir = os.path.dirname(self.flagfile)
+        if not os.path.exists(flagdir):
+            os.makedirs(flagdir, exist_ok=True)
 
         if not os.path.isfile(self.timeFilename):
             # Default to sometime long ago
@@ -126,6 +135,9 @@ class FileGroup(ConfigComponent, NewsPostMixin):
             headers['X-Transport-SerialNum'] = str(uuid.uuid4())
 
         self.posters[newsgroup].post([pathname], date=timestamp, headers=headers)
+
+        with open(self.flagfile, "a"):
+            os.utime(self.flagfile, None)
 
     def processFile(self,pathname):
 

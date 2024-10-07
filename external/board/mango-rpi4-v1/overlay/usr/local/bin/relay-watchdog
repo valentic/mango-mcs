@@ -1,0 +1,60 @@
+#!/bin/bash
+
+#####################################################################
+#
+#   Relay Watchdog
+#
+#   Check the relay flag to see if we have had successful
+#   data transfer back to the news server. If the flag is missing
+#   or older than a given age, reboot the router.
+#
+#   2024-10-06  Todd Valentic
+#               Initial implementation. Based on exchange-watchdog
+#
+#####################################################################
+
+NAME=$(basename $BASH_SOURCE)
+CONFIGFILE=/etc/default/$NAME
+KEEPALIVEFLAG=/tmp/keepalive.router
+FLAGFILE=/transmit/flags/relay.last
+DAYS=0
+MINS=
+
+if [ -f $CONFIGFILE ]; then
+    . $CONFIGFILE
+fi
+
+RebootRouter() {
+    logger -t $NAME "Rebooting router"
+    devicectl set router off
+    # The transport resource service will turn it back on
+    exit 0
+}
+
+if [ -f $KEEPALIVEFLAG ]; then
+	logger -t $NAME "Keepalive flag exists, skipping"
+	exit 0
+fi
+
+if [ ! -f $FLAGFILE ]; then
+    logger -t $NAME "Relay flag missing"
+    RebootRouter
+fi
+
+if [ ! -z "$MINS" ]; then
+    FIND_OPTS="-mmin +$MINS"
+else
+    FIND_OPTS="-mtime +$DAYS"
+fi
+
+STALEFILES=$(find $FLAGFILE $FIND_OPTS -print)
+
+if [ $STALEFILES ]; then
+    logger -t $NAME "Found stale exchange flag"
+    RebootRouter
+fi
+
+logger -t $NAME "Relay flag is still current"
+
+exit 0
+
