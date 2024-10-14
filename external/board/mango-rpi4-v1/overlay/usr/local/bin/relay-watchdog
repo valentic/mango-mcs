@@ -11,6 +11,9 @@
 #   2024-10-06  Todd Valentic
 #               Initial implementation. Based on exchange-watchdog
 #
+#   2024-10-14	Todd Valentic
+#		Make sure devicectl is in PATH
+#
 #####################################################################
 
 NAME=$(basename $BASH_SOURCE)
@@ -19,6 +22,8 @@ KEEPALIVEFLAG=/tmp/keepalive.router
 FLAGFILE=/transmit/flags/relay.last
 DAYS=0
 MINS=
+
+PATH=$PATH:/opt/transport/groups/mango/support/bin
 
 if [ -f $CONFIGFILE ]; then
     . $CONFIGFILE
@@ -57,4 +62,3 @@ fi
 logger -t $NAME "Relay flag is still current"
 
 exit 0
-
