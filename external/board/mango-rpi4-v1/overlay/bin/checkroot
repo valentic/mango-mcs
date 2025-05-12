@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Check root filesystem 
+#
+
+/sbin/fsck -y /dev/mmcblk0p2
+result=$?
+
+case $result in
+    0) exit 0; ;;
+    *) /sbin/reboot; ;;
+esac
+
+/bin/sleep 30
