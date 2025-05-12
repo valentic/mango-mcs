@@ -14,6 +14,11 @@
 #   2023-05-08  Todd Valentic
 #               Initial implementation
 #
+#   2025-10-07  Todd Valentic
+#               Disable - this doesn't seem to work to reliably restore
+#                   the link. Instead, power cycle the mifi router. Keep
+#                   here for future use if we need to try again.
+#
 ##########################################################################
 
 [ ! -x /usr/local/bin/netgear-m1.sh ] && exit 0
