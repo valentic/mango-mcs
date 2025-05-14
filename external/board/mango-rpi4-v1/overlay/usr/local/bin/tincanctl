@@ -10,6 +10,28 @@
 #   2021-07-21  Todd Valentic
 #               Add touch_flag to minimize writes if the flag is set.
 #
+#   2023-06-03  Todd Valentic
+#               Encode checksums as bytes for hashlib 
+#               Add version command
+#               Version 1.1
+#
+#   2023-06-23  Todd Valentic
+#               Unregister if check results in NOT FOUND, This will clear
+#                   out the current configuration and force a 
+#                   reregistration.
+#               Version 1.2
+#
+#   2023-07-29  Todd Valentic
+#               Ensure that we have a valid UUID. Don't set a blank one.
+#               Version 1.3
+#
+#   2024-12-30  Todd Valentic
+#               Add ability to use machine-id, make default
+#               Version 1.4
+#
+#   2025-05-09  Todd Valentic
+#               Disable SSL check if hostname is localhost
+#
 ###########################################################################
 
 import requests
@@ -23,6 +45,16 @@ import json
 import hashlib
 import uuid
 import socket
+
+# Handle python2 / python3 imports
+
+try:
+    # For python 3
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
+
+VERSION=1.4
 
 try:
     import http.client as http_client
@@ -78,11 +110,21 @@ def get_server(args):
     return open(filename).read().strip()
 
 def get_macaddr(args):
-    return open('/sys/class/net/eth0/address').read().strip()
+    for dev in ["eth0", "end0"]: 
+        filename = "/sys/class/net/%s/address" % dev
+        if os.path.exists(filename):
+            return open(filename).read().strip()
+    return ""
 
 def get_serialnum(args):
+
+    filename = '/sys/firmware/devicetree/base/serial-number'
+
+    if not os.path.exists(filename):
+        return ''
+
     # Strip out non-printable chars 
-    serialnum = open('/sys/firmware/devicetree/base/serial-number').read().strip()
+    serialnum = open(filename).read().strip()
     return ''.join([c for c in serialnum if str.isalnum(c)])
 
 def get_uuid(args):
@@ -90,17 +132,37 @@ def get_uuid(args):
     filename = os.path.join(args.datadir,'uuid')
 
     try:
-        return open(filename).read().strip()
+        uuid = open(filename).read().strip()
     except:
+        uuid = None
+
+    if not uuid: 
         return None
+
+    return uuid
+
+def get_machine_id(args):
+        
+    filename = '/etc/machine-id'
+
+    if not os.path.exists(filename):
+        return '' 
+
+    machine_id = open(filename).read().strip()
+    return machine_id
 
 def set_uuid(args):
     if args.id_src=='serialnum':
         id = get_serialnum(args)
     elif args.id_src=='macaddr':
         id = get_macaddr(args)
+    elif args.id_src=="machine-id":
+        id = get_machine_id(args)
     else:
         id = uuid.uuid4().hex
+
+    if id == '':
+        raise ValueError('Not setting an empty UUID')
 
     filename = os.path.join(args.datadir,'uuid')
 
@@ -186,8 +248,8 @@ def save_config(args, data):
     payload = json.dumps(data)
 
     if os.path.exists(filename):
-        new_checksum = hashlib.md5(payload).hexdigest()
-        old_checksum = hashlib.md5(open(filename).read()).hexdigest()
+        new_checksum = hashlib.md5(payload.encode('utf-8')).hexdigest()
+        old_checksum = hashlib.md5(open(filename, 'rb').read()).hexdigest()
 
         if new_checksum == old_checksum:
             return
@@ -203,6 +265,12 @@ def load_config(args):
         return json.loads(open(filename).read())
 
     return {}
+
+def del_config():
+    filename = datafile(args, CONFIG_DATA)
+
+    if os.path.exists(filename):
+        os.remove(filename)
 
 def sshkey_match(args):
 
@@ -243,8 +311,15 @@ def post(args,endpoint,data):
 
     url = '%s/api/mesh/%s' % (server,endpoint)
     headers = {'MESH-APIKEY': apikey} 
+    verify = urlparse(url).hostname != "localhost"
 
-    return requests.post(url,headers=headers,data=data,timeout=args.timeout)
+    return requests.post(
+        url, 
+        headers = headers,
+        data = data,
+        timeout = args.timeout,
+        verify = verify
+    )
 
 def patch(args,endpoint,instance,data):
 
@@ -253,8 +328,15 @@ def patch(args,endpoint,instance,data):
 
     url = '%s/api/mesh/%s/%s' % (server,endpoint,instance)
     headers = {'MESH-APIKEY': apikey} 
+    verify = urlparse(url).hostname != "localhost"
 
-    return requests.patch(url,headers=headers,data=data,timeout=args.timeout)
+    return requests.patch(
+        url,
+        headers = headers,
+        data = data,
+        timeout = args.timeout,
+        verify = verify
+    )
  
 #-------------------------------------------------------------------------
 # Command Processors 
@@ -296,6 +378,8 @@ def ProcessUnregister(args):
 
     clear_flag(args, REGISTERED_PENDING) 
     clear_flag(args, REGISTERED) 
+
+    del_config()
 
 def ProcessPause(args):
     logging.info('Pausing')
@@ -353,7 +437,7 @@ def ProcessStatus(args):
     try:
         apikey = get_apikey(args)
     except:
-        apiKey = None
+        apikey = None
 
     try:    
         server = get_server(args)
@@ -392,6 +476,7 @@ def ProcessStatus(args):
     logging.info('SSH key   : %s' % sshkey_status)
     logging.info('MAC addr  : %s' % get_macaddr(args))
     logging.info('Serial num: %s' % get_serialnum(args))
+    logging.info('Machine id: %s' % get_machine_id(args))
     logging.info('UUID      : %s' % node_id) 
     logging.info('Registered: %s' % registered)
 
@@ -414,7 +499,9 @@ def ProcessCron(args):
     try:
         ProcessCheckin(args)
     except requests.exceptions.HTTPError as err:
-        if 'NOT FOUND' not in str(err):
+        if 'NOT FOUND' in str(err):
+            ProcessUnregister(args) 
+        else:
             raise(err)
 
     # Check if our SSH key matches the one on the server
@@ -452,7 +539,7 @@ Commands = {
     'checkin':          ProcessCheckin,
     'set-uuid':         ProcessSetUUID,
     'status':           ProcessStatus,
-    'cron':             ProcessCron
+    'cron':             ProcessCron,
     }
 
 if __name__ == '__main__':
@@ -483,9 +570,9 @@ if __name__ == '__main__':
             help='Data directory (default /etc/tincan/flags)')
 
     parser.add_argument('-i','--id',dest='id_src',
-            default='serialnum',
-            choices=['serialnum','macaddr','generate'],
-            help='Unique ID (default is serialnum)')
+            default='machine-id',
+            choices=['serialnum','macaddr','generate','machine-id'],
+            help='Unique ID (default is machine-id)')
 
     parser.add_argument('-t','--timeout',dest='timeout',
             default=15,type=int,
@@ -493,6 +580,9 @@ if __name__ == '__main__':
 
     parser.add_argument('-v','--verbose',action='store_true',
             help='Verbose output')
+
+    parser.add_argument('-V','--version',action='store_true',
+            help='Print version')
 
     #-- Process ----------------------------------------------------
 
@@ -507,7 +597,15 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(level=logging.INFO)
 
+    if args.version:
+        print(VERSION)
+        sys.exit(0) 
+
     make_flagdir(args)
+
+    if args.command is None:
+        parser.print_help()
+        sys.exit(0)
 
     result = Commands[args.command](args)
 

@@ -4,16 +4,20 @@
 #
 #   SSH Tunnel Link 
 #
-#   This script will bring up the SSH tunnel if it is down. Run it
-#   from cron every minute to maintain the link.
-#
-#   Call it as: 
+#   This script will bring up the SSH tunnel if it is down. It can be run
+#   either from cron or as a systemd service. If running from cron, call
+#   it periodically (i.e., every minute) with the start command. If the 
+#   link is up, the script will simply exit. Otherwise it will bring up
+#   the link. If running as a systemd service, use the foreground (-f).
+#   The service will restart the link if the connection stops. 
+#   
+#   Commands:
 #       
-#       sshlink2.tincan start
-#       sshlink2.tincan stop
-#       sshlink2.tincan restart
-#       sshlink2.tincan status
-#       sshlink2.tincan help
+#       sshlink2.tincan start		- Start link if down
+#       sshlink2.tincan stop		- Stop link
+#       sshlink2.tincan restart		- Stop/start link
+#       sshlink2.tincan status		- Show link status
+#       sshlink2.tincan help		- Command help
 #
 #   A profile is specified with -p and is one of:
 #
@@ -23,7 +27,7 @@
 #   It will source the following files:
 #
 #       /etc/tincan/sshlink/defaults.conf
-#       /etc/tincan/sshlink/profile.conf (or backup.conf)
+#       /etc/tincan/sshlink/<profile>.conf (primary.conf or backup.conf)
 #       /etc/tincan/data/config.json
 #
 #   The SSH key should be in:
@@ -32,9 +36,33 @@
 #
 #   Run from cron: 
 #
-#       /etc/cron.d/sshlink-<server>
+#       /etc/cron.d/sshlink
 #
-#       */1 * * * * root /usr/local/bin/sshlink <server>
+#       */1 * * * * /usr/local/bin/sshlink2.tincan -p primary start 
+#       */1 * * * * /usr/local/bin/sshlink2.tincan -p backup start
+#
+#   Run from systemd as service:
+#
+#   	/usr/lib/systemd/system/tincan-sshlink@.service
+#
+#   	    [Unit]
+#           Description=Tincan network SSH tunnel (%I)
+#   	    Wants=network-online.target
+#   	    After=network-online.target
+#
+#   	    [Service]
+#   	    Type=simple
+#   	    ExecStart=/usr/local/bin/sshlink2.tincan -p %i -f start
+#   	    Restart=always
+#   	    RestartSec=5
+#   	    RestartSteps=12
+#   	    RestartMaxDelaySec=60
+#
+#   	    [Install]
+#   	    WantedBy=multi-user.target
+#
+#	sudo systemctl enable --now tincan-sshlink@primary
+#	sudo systemctl enable --now tincan-sshlink@backup
 #
 #   To log output to the system logger, use -v|--verbose or set
 #   VERBOSE=1 in the config file (profile or default). 
@@ -60,6 +88,17 @@
 #   2021-07-26  Todd Valentic
 #               Handle pid look up when not registered yet.
 #
+#   2025-01-07  Todd Valentic
+#               Add foreground mode for running from systemd service        
+#               
+#   2025-01-12  Todd Valentic
+#               Better handle pending case
+#
+#   2025-05-09  Todd Valentic
+#               Improve documentation
+#               Add support for tunnel type in config.json. Only start 
+#                 if the tunnel type is set to be client originated. 
+#
 ##########################################################################
 
 ##########################################################################
@@ -68,6 +107,7 @@
 BASEDIR=/etc/tincan
 PROFILE=primary
 VERBOSE=0
+FOREGROUND=0
 
 usage() {
     echo "
@@ -83,6 +123,7 @@ usage() {
     Options:
        -h         - Show help
        -v         - Verbose output
+       -f         - Foreground
        -p PROFILE - Profile (see below)
    
     Profiles:
@@ -93,7 +134,7 @@ usage() {
     exit 2
 }
 
-PARSED_ARGS=$(getopt -n sshlink2 -o hvp: -l help,verbose,profile: -- "$@")
+PARSED_ARGS=$(getopt -n sshlink2 -o hvfp: -l help,verbose,foreground,profile: -- "$@")
 VALID_ARGS=$?
 
 if [ "$VALID_ARGS" != "0" ]; then 
@@ -107,6 +148,7 @@ do
     case "$1" in 
         -h | --help)    usage                       ;;  
         -v | --verbose) VERBOSE=1       ; shift     ;;
+        -f | --foreground) FOREGROUND=1 ; shift     ;;
         -p | --profile) PROFILE="$2"    ; shift 2   ;;
         # end of argument processing
         --) shift; break; ;;
@@ -132,7 +174,7 @@ CONF_JSON=$DATADIR/config.json
 # Default values from default.conf and $PROFILE.conf 
 
 INND_PORT=
-CUTRATE=
+CUTRATE=0
 EXTRA_OPTS=
 LOGGER_OPTS=
 SSHKEY=$KEYDIR/ssh.key
@@ -185,6 +227,23 @@ fi
 
 LOGGER="logger $LOGGER_OPTS -t sshlink-$PROFILE"
 
+SSHOPTS=$(cat << EOF
+    $MESH_SSH_USER@$MESH_SSH_HOST 
+    -C -N 
+    -o TCPKeepAlive=no 
+    -o ServerAliveInterval=$SSH_SERVERALIVEINTERVAL 
+    -o ServerAliveCountMax=$SSH_SERVERALIVECOUNT 
+    -o StrictHostKeyChecking=no 
+    -o ConnectTimeout=$SSH_CONNECTTIMEOUT 
+    -o ExitOnForwardFailure=yes 
+    -p $MESH_SSH_HOST_PORT 
+    -i $SSHKEY 
+    -R $CALLBACK_PORT:127.0.0.1:22  
+    ${INND_OPT}  
+    ${EXTRA_OPTS}
+EOF
+)
+
 ##########################################################################
 # Log if verbose
 
@@ -211,7 +270,9 @@ find_ssh_pid() {
         return
     fi
 
-    local pid=`ps -o pid,args -C ssh --no-headers | grep "ssh $MESH_SSH_USER@$MESH_SSH_HOST" | grep $CALLBACK_PORT | cut -f 1 -d s`
+    local pattern="ssh.*$MESH_SSH_USER@$MESH_SSH_HOST.*$CALLBACK_PORT"
+    local pid=`ps -o pid,args -C ssh --no-headers | grep -E $pattern | cut -f 1 -d s`
+
     echo $pid 
 }
 
@@ -233,7 +294,7 @@ check_link() {
     fi
 
     if [ -n "$LINKPID" ] ; then
-        if [ -n "$CUTRATE" ] && [ $((CURMINUTE % CUTRATE)) -eq 0 ]; then
+	    if [ -n "$CUTRATE" ] && [ $((CURMINUTE % CUTRATE)) -eq 0 ]; then
             log "Cut time reached. Dropping link"
             kill $LINKPID
         else 
@@ -263,22 +324,9 @@ drop_link() {
 ##########################################################################
 # Start link
 
-start_link() {
+start_link_background() {
 
-    ssh $MESH_SSH_USER@$MESH_SSH_HOST \
-        -n -f -C -N \
-        -o TCPKeepAlive=no \
-        -o ServerAliveInterval=$SSH_SERVERALIVEINTERVAL \
-        -o ServerAliveCountMax=$SSH_SERVERALIVECOUNT \
-        -o StrictHostKeyChecking=no \
-        -o ConnectTimeout=$SSH_CONNECTTIMEOUT \
-        -o ExitOnForwardFailure=yes \
-        -p $MESH_SSH_HOST_PORT \
-        -i $SSHKEY \
-        -R $CALLBACK_PORT:127.0.0.1:22  \
-        ${INND_OPT}  \
-        ${EXTRA_OPTS}  \
-        2>&1 /dev/null
+    ssh -n -f $SSHOPTS 2>&1 /dev/null
 
     if [ "$?" -eq 0 ] ; then
         log "Success starting link" 
@@ -288,6 +336,10 @@ start_link() {
         exit 1
     fi
 
+}
+
+start_link_foreground() {
+    exec timeout $CUTRATE ssh $SSHOPTS 
 }
 
 show_status() {
@@ -304,8 +356,16 @@ show_status() {
 case "$COMMAND" in 
 
     start)
-        check_link
-        start_link
+	    if [ "$MESH_PENDING" == "true" ] ; then
+	        log "Pending at server"
+        elif [ "$MESH_TUNNEL" == "server" ] ; then
+            : # do nothing
+	    elif [ "$FOREGROUND" == "1" ] ; then
+	        start_link_foreground
+	    else
+            check_link
+            start_link_background
+	    fi
         ;;
 
     stop)
