@@ -23,6 +23,13 @@
 #   2024-10-06  Todd Valentic
 #               Update flag file timestamp on successful post
 #
+#   2025-05-13  Todd Valentic
+#               Protect NewPostMixin call in FileGroup to handle cases
+#                   where the network is unavailable in startup (for 
+#                   some reason the BDR site modem comes on for a short
+#                   time and then goes off before the startup is complete).
+#                   NewPostMixin exits, so we don't get auto restarted.
+#
 ############################################################################
 
 from Transport      import ProcessClient
@@ -45,7 +52,13 @@ class FileGroup(ConfigComponent, NewsPostMixin):
 
     def __init__(self,name,parent):
         ConfigComponent.__init__(self, 'filegroup', name, parent)
-        NewsPostMixin.__init__(self, name=None)
+
+        while self.running:
+            try:
+                NewsPostMixin.__init__(self, name=None)
+                break
+            except:
+                self.wait(15)
 
         self.startPath      = self.get('start.path','.')
         self.matchPaths     = self.getList('match.paths','*')
@@ -68,8 +81,8 @@ class FileGroup(ConfigComponent, NewsPostMixin):
         self.timeFilename   = '%s.timestamp' % name
 
         flagdir = os.path.dirname(self.flagfile)
-        if not os.path.exists(flagdir):
-            os.makedirs(flagdir, exist_ok=True)
+        if flagdir and not os.path.exists(flagdir):
+            os.makedirs(flagdir)
 
         if not os.path.isfile(self.timeFilename):
             # Default to sometime long ago

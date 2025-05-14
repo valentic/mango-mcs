@@ -7,5 +7,8 @@ Online system update for mango-rpi4-v1
     - Add relay watchdog 
     - Set power outlet #5 for router 
     - Add router device and resource
+    - Make relay more robust to network outage at startup
+    - Check filesystem (fsck) at boot
+    - Release 1.20
 
 
