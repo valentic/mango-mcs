@@ -1,0 +1,11 @@
+==========================================================================
+20251110  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add camera.bootime parameter for delay in camera mapping
+    - Map cameras if mapping file exists but is empty 
+    - Release 1.22 
+
+
