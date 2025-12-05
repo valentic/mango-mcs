@@ -59,6 +59,9 @@
 #   2021-08-17  Todd Valentic
 #               Add REST API support to PDU_powerswitch 
 #
+#   2025-12-03  Todd Valentic
+#               Add manual model
+#
 ###############################################################################
 
 from ParseKit import parseFloats
@@ -558,6 +561,32 @@ class PDU_webpowerswitch(PDUBase):
         self.check_protocol()
         return self.protocol_sp_map[self.protocol](*pos, **kw)
 
+class PDU_manual(PDUBase):
+
+    # Manual outlet / power strip 
+    #
+    # There are times we don't have a PDU device, either during
+    # testing or if one fails in the field and we need to work
+    # around my plugging into an always on outlet.
+
+    def __init__(self,addr=None, num_outlets=8, **args):
+        interface = InterfaceBase(addr)
+        super(PDU_manual,self).__init__(interface,'manual',**args)
+
+        self.num_outlets = num_outlets
+
+        self.setDataMap({
+            'RS':   self.RS
+            })
+
+    def RS(self):
+        self.data['RS'] = ['on'] * self.num_outlets 
+        return self.data['RS'] 
+
+    def SP(self, *pos, **kw):
+        return self.data 
+
+
 def PDU(model=None,*pos,**args):
     
     if model=='v2':
@@ -566,6 +595,8 @@ def PDU(model=None,*pos,**args):
         return PDU_sp(*pos,**args)
     elif model=='webpowerswitch':
         return PDU_webpowerswitch(*pos,**args)
+    elif model=='manual':
+        return PDU_manual(*pos,**args)
 
     raise ValueError('Unknown PDU type: %s' % model)
 
@@ -577,7 +608,8 @@ if __name__ == '__main__':
     #pdu_v2  = PDU(model='v2',addr='10.51.10.81:8880')
     #pdu_sp  = PDU(model='sp',addr='/dev/ttyZ1')
     #pdu_wps  = PDU(model='webpowerswitch',addr='192.168.0.100',auth='transport:mangonet0')
-    pdu_wps  = PDU(model='webpowerswitch',addr='192.168.0.100',auth='admin:1234')
+    #pdu_wps  = PDU(model='webpowerswitch',addr='192.168.0.100',auth='admin:1234')
+    pdu_wps  = PDU(model='manual')
 
     with pdu_wps as pdu: 
         pdu.SP(3,'on')

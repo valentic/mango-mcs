@@ -39,6 +39,13 @@
 #   2022-05-05  Todd Valentic
 #               Shutdown if problem connecting to camera
 #
+#   2025-12-05  Todd Valentic
+#               Handle case where camera is always powered on
+#                   (i.e. using the manual model power switch).
+#                   - Don't startup 
+#                   - Add device_on() method to check camera power
+#                   - Make isOn() depend on device and camera obj
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -122,21 +129,19 @@ class CameraMonitor(NightDataMonitorComponent):
         self.log.debug('camera config: %s' % self.camera_config)
 
     def isOn(self):
+        return self.device_on() and self.camera
+
+    def device_on(self):
         status = self.getStatus()
         try:
             return status.get('device',self.name)=='on'
         except:
             return False
 
-    def startup(self):
-        
-        if self.isOn():
-            self.goingOffToOn()
-
     def shutdown(self):
-
+    
         if self.isOn():
-            self.goingOnToOff()
+           self.goingOnToOff()
 
     def set_flag(self, filename):   
 
@@ -218,7 +223,7 @@ class CameraMonitor(NightDataMonitorComponent):
 
     def shutdown(self):
 
-        if self.isOn():
+        if self.device_on():
             self.goingOnToOff()
 
     def update_camera_config(self):
