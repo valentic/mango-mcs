@@ -5,7 +5,8 @@
 ################################################################################
 
 INN2_VERSION = 2.6.3 
-INN2_SITE = ftp://ftp.isc.org/isc/inn
+#INN2_SITE = ftp://ftp.isc.org/isc/inn
+INN2_SITE = https://downloads.isc.org/isc/inn/OLD/2.6
 INN2_SOURCE = inn-$(INN2_VERSION).tar.gz
 INN2_LICENSE = GPLv2+ and BSD and MIT and Public Domain 
 INN2_LICENSE_FILES = LICENSE 
