@@ -10,12 +10,17 @@
 #   2021-07-23  Todd Valentic
 #               Add label config parameter
 #
+#   2025-12-18  Todd Valentic
+#               Streamline image capture - match SDK example program
+#               Add log parameter, log capture steps
+#
 ###########################################################################
 
 import ctypes
 import sys
 import datetime
 import time
+import logging
 
 from collections import OrderedDict
 from dotdict import DotDict
@@ -27,6 +32,7 @@ CAMERA_ERROR = -1
 CAMERA_IDLE = 0
 CAMERA_WAITING = 1
 CAMERA_EXPOSING = 2
+CAMERA_READING = 3
 CAMERA_DOWNLOADING = 4
 CAMERA_FLUSHING = 5
 
@@ -49,11 +55,12 @@ class CameraError(Exception):
 
 class CameraDevice:
 
-    def __init__(self, controller, device, config=None):
+    def __init__(self, controller, device, config=None, log=None):
 
         self.controller = controller
         self.driver = controller.driver
         self.device = device
+        self.log = log or logging
 
         self.reset_config(config)
         self._reset_state()
@@ -63,7 +70,8 @@ class CameraDevice:
     def __del__(self):
         """Make sure that we tell teh camera CCD to warm up."""
 
-        if self.handle:
+        #if self.handle:
+        if self.is_connected():
             self.warmup()
             self.disconnect()
 
@@ -161,26 +169,47 @@ class CameraDevice:
 
         # Start the exposure
 
+        camera_state = None 
+        deadline = time.time()+exposure_time+180
         start_time = datetime.datetime.utcnow()
         self.start_exposure(exposure_time)
 
-        # If we are waiting or exposing, sleep until expected finish time 
+        # Wait until we are done or timeout
 
-        if self.get_camera_state() in [CAMERA_WAITING, CAMERA_EXPOSING]:
-            now = datetime.datetime.utcnow()
-            seconds_since_start = (now - start_time).total_seconds()
-            sleep_seconds = exposure_time - seconds_since_start
-
-            if sleep_seconds > 0:
-                time.sleep(sleep_seconds)
-
-        # Wait until image is ready to download
-
-        deadline = time.time()+30
         while not self.image_ready():
-            time.sleep(0.1)
             if time.time() > deadline:
-                raise IOError('Camera timeout')
+                raise IOError("Camera timeout")
+
+            new_state = self.get_camera_state()
+
+            if new_state != camera_state:
+                camera_state = new_state
+
+                if camera_state == CAMERA_ERROR:
+                    self.log.info("Camera error detected")
+                    raise IOError("Camera error")
+
+                elif camera_state == CAMERA_IDLE:
+                    self.log.info("  idle")
+
+                elif camera_state == CAMERA_WAITING:
+                    self.log.info("  waiting")
+
+                elif camera_state == CAMERA_EXPOSING:
+                    self.log.info("  exposing")
+
+                elif camera_state == CAMERA_READING:
+                    self.log.info("  reading")
+
+                elif camera_state == CAMERA_DOWNLOADING:
+                    self.log.info("  downloading")
+
+                elif camera_state == CAMERA_FLUSHING:
+                    self.log.info("  flushing")
+
+            time.sleep(0.1)
+
+        self.log.info("  image ready")
 
         now = datetime.datetime.utcnow()
         total_capture_time = (now - start_time).total_seconds()
@@ -386,8 +415,9 @@ class CameraDevice:
 
 class CameraController:
 
-    def __init__(self,library='./libatikcameras.so'):
+    def __init__(self,library='./libatikcameras.so', log=None):
 
+        self.log = log or logging
         self.driver = self._load_driver(library) 
 
     #-- Internal methods -------------------------------------------------
@@ -452,7 +482,7 @@ class CameraController:
         if not self.is_camera(device):
             raise IOError('Device at %d is not a camera' % device)
 
-        return CameraDevice(self, device, config) 
+        return CameraDevice(self, device, config=config, log=self.log) 
 
     def connect_by_name(self, name, config=None):
 

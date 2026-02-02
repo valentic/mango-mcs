@@ -85,7 +85,7 @@ class MonitorManager(ProcessClient, DirectoryMixin):
         self.resources = self.connect('resources')
 
         try:
-            self.controller = CameraController(library=self.atik_library)
+            self.controller = CameraController(library=self.atik_library, log=self.log)
         except:
             self.log.exception('Failed to create camera controller')
             self.abort()

@@ -46,6 +46,9 @@
 #                   - Add device_on() method to check camera power
 #                   - Make isOn() depend on device and camera obj
 #
+#   2025-12-18  Todd Valentic
+#               Print two significant digits for exposure time
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -303,7 +306,7 @@ class CameraMonitor(NightDataMonitorComponent):
             self.shutdown()
             return None
 
-        summary = '%.1fs / %.1fs / %.0fKB / %.1fC' % (
+        summary = '%.2fs / %.1fs / %.0fKB / %.1fC' % (
             image_data.exposure_time,
             image_data.capture_time,
             image_data.image_bytes / 1024,
