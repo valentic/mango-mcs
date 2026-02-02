@@ -2,11 +2,17 @@
 #
 # mgetty
 #
+# 2026-02-02 	Todd Valentic
+# 				Work around some sites blocking FTP access.	
+# 				Pull the source tarball from Debian instead.
+#
 #############################################################
 
 MGETTY_VERSION = 1.2.1
-MGETTY_SITE = ftp://mgetty.greenie.net/pub/mgetty/source/1.2
-MGETTY_SOURCE = mgetty-$(MGETTY_VERSION).tar.gz
+#MGETTY_SITE = ftp://mgetty.greenie.net/pub/mgetty/source/1.2
+#MGETTY_SOURCE = mgetty-$(MGETTY_VERSION).tar.gz
+MGETTY_SITE = http://deb.debian.org/debian/pool/main/m/mgetty
+MGETTY_SOURCE = mgetty_$(MGETTY_VERSION).orig.tar.gz
 MGETTY_LICENSE = GPL 
 MGETTY_LICENSE_FILES = COPYING
 
