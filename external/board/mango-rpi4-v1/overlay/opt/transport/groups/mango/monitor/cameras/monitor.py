@@ -49,6 +49,9 @@
 #   2025-12-18  Todd Valentic
 #               Print two significant digits for exposure time
 #
+#   2026-02-03  Todd Valentic
+#               Add ability to reset the USB ports on start up
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -58,6 +61,7 @@ import os
 import sys
 import time
 import struct
+import commands
 import ConfigParser
 import StringIO
 
@@ -75,6 +79,9 @@ class CameraMonitor(NightDataMonitorComponent):
 
         self.station = self.get('station','Unknown')
         self.cacheService.set_timeout(self.name,60*10)
+
+        self.need_usb_reset = self.getboolean('usb_reset', False)
+        self.usb_reset_cmd = self.getboolean('usb_reset.cmd', '/usr/local/bin/resetusb') 
 
     def getParameters(self, schedule):
 
@@ -170,11 +177,26 @@ class CameraMonitor(NightDataMonitorComponent):
             self.log.info('Clearing keepalive flag')
             os.remove(filename)
 
+    def usb_reset(self):
+
+        self.log.info("Reseting USB ports")
+
+        status, output = commands.getstatusoutput(self.usb_reset_cmd)
+
+        if status != 0:
+            self.log.error("Problem running USB reset command")
+            self.log.error("  cmd: %s" % self.usb_reset_cmd)
+            self.log.error("  status: %s" % status)
+            self.log.error("  output: %s" % output)
+
     def goingOffToOn(self):
 
         self.setResources('%s=on' % self.name)
 
         self.set_flag(self.keepalive_flag)
+
+        if self.need_usb_reset:
+            self.usb_reset()
 
         # Wait for device to come online
         self.wait(5)
