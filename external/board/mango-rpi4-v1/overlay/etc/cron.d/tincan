@@ -1,2 +1,2 @@
 # Manage tincan network 
-*/1 * * * * /usr/local/bin/tincanctl cron
+*/1 * * * * /usr/local/bin/tincanctl -i serialnum cron
