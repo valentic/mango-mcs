@@ -1,0 +1,14 @@
+==========================================================================
+20260313  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add dnsmasq 
+    - Add ethtool
+    - Change domain to be .internal (from .tincan.net)
+    - Update firewall to allow DHCP and NAT
+    - Add support for the MSNSwitch2 PDU
+    - Release 1.25 
+
+
