@@ -21,6 +21,10 @@
 #   2021-07-12  Todd Valentic
 #               Run reconcile in background
 #
+#   2026-03-12  Todd Valentic
+#               Set state to unknown if entry missing 
+#               Add ability to ignore processing 
+#
 ###########################################################
 
 from Transport      import ProcessClient
@@ -44,7 +48,7 @@ class ResourceState(ConfigComponent):
         replaceState = PatternTemplate('state')
         self.command = self.get('command')
         self.service = self.get('service')
-        self.values  = self.getList('values',self.get('value',''))
+        self.values  = self.getList('values',self.get('value',name))
 
         if self.command:
             self.command = replaceState(self.command,name)
@@ -62,6 +66,7 @@ class Resource(ConfigComponent):
         self.params     = set(self.getList('params'))
         self.reset      = self.get('reset.state',self.order[0])
         self.default    = self.get('default.state',self.order[-1])
+        self.ignore     = self.get('ignore.state')
         self.section    = self.get('status.section','DEFAULT')
         self.key        = self.get('status.key','')
 
@@ -89,7 +94,11 @@ class Resource(ConfigComponent):
     def getStatus(self,config,param):
 
         key = self.replaceParam(self.key,param)
-        value = config.get(self.section,key)
+
+        try:
+            value = config.get(self.section,key)
+        except ConfigParser.NoOptionError:
+            value = 'unknown' 
 
         for state in self.states.values():
             if value in state.values:
@@ -134,6 +143,9 @@ class Resource(ConfigComponent):
                 curState = self.getStatus(config,param)
             except:
                 self.log.exception('Failed to get status for %s' % self.name)
+                continue
+
+            if self.ignore and curState == self.ignore:
                 continue
 
             if curState!=nextState:

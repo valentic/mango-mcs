@@ -29,7 +29,7 @@
 #   VER()    -- Report firmware version
 #   UP()     -- Uptime information
 #
-#   PDUwps only implements:
+#   The webpowerswitch and msnswitch2 only implement:
 #       SP
 #       RP
 #
@@ -62,6 +62,9 @@
 #   2025-12-03  Todd Valentic
 #               Add manual model
 #
+#   2026-03-12  Todd Valentic
+#               Add support for the MSNSwitch2 (UIS-722) model
+#
 ###############################################################################
 
 from ParseKit import parseFloats
@@ -73,7 +76,6 @@ import serial
 import re
 import os
 import datetime
-#import pytz
 import time
 import urllib
 import requests
@@ -146,6 +148,9 @@ class HTTPInterface(InterfaceBase):
 
     def read(self):
         return self.response.text
+
+    def read_json(self):
+        return self.response.json()
 
 class SocketInterface(InterfaceBase):
     
@@ -561,6 +566,46 @@ class PDU_webpowerswitch(PDUBase):
         self.check_protocol()
         return self.protocol_sp_map[self.protocol](*pos, **kw)
 
+class PDU_msnswitch2(PDUBase):
+
+    # MSWswitch2 power switch 
+    #
+    # Uses the REST API. The local IP needs to be added to the white list
+    # in the switch configuration via the web interface. No authentication
+    # is needed to use the API.
+
+    def __init__(self,addr=None,auth=None,scheme='http',**args):
+        interface = HTTPInterface(addr,auth=None,scheme=scheme)
+        super(PDU_msnswitch2,self).__init__(interface,'msnswitch2',**args)
+
+        self.setDataMap({
+            'RS':   self.RS
+            })
+
+    def sendCommand(self,cmd, method='GET', data=None, headers=None):
+
+        try:
+            self.interface.write(cmd, method=method, data=data, headers=headers)
+            data = self.interface.read_json()
+        except socket.timeout:
+            self.log.error('Timeout')
+            raise
+
+        return data
+
+    def RS(self):
+
+        outlets = self.sendCommand('api/status')["status"]["outlet"]
+
+        values = ['on' if outlet['status'] else 'off' for outlet in outlets]
+        self.data["RS"] = values
+
+        return values
+ 
+    def SP(self,fet,state):
+        data = dict(target="outlet%s" % fet, action=state)
+        return self.sendCommand("api/control", data=data)
+
 class PDU_manual(PDUBase):
 
     # Manual outlet / power strip 
@@ -595,6 +640,8 @@ def PDU(model=None,*pos,**args):
         return PDU_sp(*pos,**args)
     elif model=='webpowerswitch':
         return PDU_webpowerswitch(*pos,**args)
+    elif model=='msnswitch2':
+        return PDU_msnswitch2(*pos,**args)
     elif model=='manual':
         return PDU_manual(*pos,**args)
 
@@ -609,12 +656,13 @@ if __name__ == '__main__':
     #pdu_sp  = PDU(model='sp',addr='/dev/ttyZ1')
     #pdu_wps  = PDU(model='webpowerswitch',addr='192.168.0.100',auth='transport:mangonet0')
     #pdu_wps  = PDU(model='webpowerswitch',addr='192.168.0.100',auth='admin:1234')
-    pdu_wps  = PDU(model='manual')
+    #pdu_wps  = PDU(model='manual')
+    pdu_api  = PDU(model='msnswitch2',addr='192.168.0.201')
 
-    with pdu_wps as pdu: 
-        pdu.SP(3,'on')
+    with pdu_api as pdu: 
+        pdu.SP(1,'on')
         print pdu.updateData()
         time.sleep(2)
-        pdu.SP(3,'off')
+        pdu.SP(1,'off')
         print pdu.updateData()
 
