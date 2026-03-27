@@ -30,6 +30,15 @@
 #                   time and then goes off before the startup is complete).
 #                   NewPostMixin exits, so we don't get auto restarted.
 #
+#   2026-03-27  Todd Valentic
+#               The NewsPostMixin code calls abort() internally under
+#                   different error conditions. We don't want that and
+#                   need to catch errors instead and keep retrying. This
+#                   is why the code exits when the modem restarts. We
+#                   cannot easily change the NewsPostMixin code, so as
+#                   a work around, we redefine abort in the component
+#                   and raise the error there.
+#
 ############################################################################
 
 from Transport      import ProcessClient
@@ -53,6 +62,8 @@ class FileGroup(ConfigComponent, NewsPostMixin):
     def __init__(self,name,parent):
         ConfigComponent.__init__(self, 'filegroup', name, parent)
 
+        self.abort = self.my_abort
+
         while self.running:
             try:
                 NewsPostMixin.__init__(self, name=None)
@@ -71,7 +82,7 @@ class FileGroup(ConfigComponent, NewsPostMixin):
         self.enableParseTime = self.getboolean('parseTime',True)
         self.enableSerialNum = self.getboolean('serialNum',False)
 
-        self.flagfile       = self.get('flagfile','relay')
+        sduring elf.flagfile       = self.get('flagfile','relay')
 
         self.pathRule       = PatternTemplate('path','/')
 
@@ -96,6 +107,11 @@ class FileGroup(ConfigComponent, NewsPostMixin):
         self.log.info('Watching for files in %s' % self.startPath)
         self.log.info('   - match paths %s' % ' '.join(self.matchPaths))
         self.log.info('   - match names %s' % ' '.join(self.matchNames))
+
+    def my_abort(self):
+        """Replace the standard abort() and raise exception instead"""
+
+        raise IOError("Connection issue")
 
     def parseTime(self, filename):
             
