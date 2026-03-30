@@ -1,3 +1,7 @@
 build
 dl
 secrets
+.bash_history
+.buildroot-ccache/
+.wget-hsts
+
