@@ -1,0 +1,24 @@
+#!/bin/sh
+
+##########################################################################
+#
+#   Reset USB port on Raspberry Pi 4 by turning port power off and on.
+#
+#   The uhubctl command is white listed in /etc/sudoers.d/20_transport
+#       so no password is required by the transport group.
+#
+#   2026-02-02  Todd Valentic
+#               Initial implementation
+#
+##########################################################################
+
+logger -t resetusb "Turning USB ports off"
+
+sudo /usr/sbin/uhubctl -l 1-1 -a 0
+sleep 5
+
+logger -t resetusb "Turning USB ports on"
+
+sudo /usr/sbin/uhubctl -l 1-1 -a 1
+sleep 5
+

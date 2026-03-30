@@ -1,0 +1,12 @@
+==========================================================================
+20260202  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Ensure we set serialnum as id for tincanctl in cron 
+    - Updated camera controller, monitor and manager 
+    - Add manual mode to pductl
+    - Release 1.24 
+
+
