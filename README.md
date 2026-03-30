@@ -1,14 +1,4 @@
----
-
-# MANGO Camera System (MCS) Embedded Data Transport System 
-
-**2021-07-21 — Todd Valentic**
-Initial implementation
-
-**2026-03-30 — Todd Valentic**
-Update for container-based builds
-
----
+# MANGO Camera System (MCS) Embedded Data Transport System
 
 # Overview
 
@@ -449,4 +439,15 @@ Buildroot — Build system for embedded Linux
 
 BusyBox — Lightweight implementations of common UNIX utilities
 [https://busybox.net](https://busybox.net)
+
+---
+
+# Revision history
+
+
+| Date       | Author       | Description           |
+| ---------- | ------------- | -----------------------|
+| 2021-07-21 | Todd Valentic | Initial implementation |
+| 2026-03-30 | Todd Valentic | Update for container-based builds |
+
 
