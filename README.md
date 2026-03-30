@@ -126,9 +126,6 @@ components are rebuilt.
 
 The generated disk image can be written to an SD card using `dd`.
 
-> [!CAUTION]
-> This will **erase all data on the device**.
-
 ## Identify the Device
 
 Insert the SD card and run:
@@ -445,9 +442,9 @@ BusyBox — Lightweight implementations of common UNIX utilities
 # Revision history
 
 
-| Date       | Author       | Description           |
-| ---------- | ------------- | -----------------------|
-| 2021-07-21 | Todd Valentic | Initial implementation |
-| 2026-03-30 | Todd Valentic | Update for container-based builds |
+| Date       | Author        | Description                                |
+| ---------- | ------------- | ------------------------------------------ |
+| 2021-07-21 | Todd Valentic | Initial implementation                     |
+| 2026-03-30 | Todd Valentic | Update for container-based builds          |
 
 
