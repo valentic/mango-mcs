@@ -1,0 +1,11 @@
+==========================================================================
+20260720  System Update
+==========================================================================
+
+Online system update for mango-rpi4-v1
+
+    - Add retries for camera monitor 
+    - Add USB reset at boot for TP-Link adapters 
+    - Release 1.26 
+
+

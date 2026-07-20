@@ -1,0 +1,26 @@
+#!/bin/sh
+
+##########################################################################
+# 
+#   Create servicepack tarball
+#
+#   2021-07-27  Todd Valentic
+#               Initial implementation
+#
+##########################################################################
+
+PROJECT=$(pwd | awk -F/ '{print $(NF-2)}')
+
+SERVICEPACK=$(find . -name 'servicepack*' -type d -print)
+SERVICEPACK=$(basename $SERVICEPACK)
+TARBALL=$PROJECT-$SERVICEPACK.tgz
+
+rm -f $TARBALL
+
+cd $SERVICEPACK
+tar zcf ../$TARBALL --exclude .svn *
+cd ..
+
+echo "Created $TARBALL"
+
+exit 0
