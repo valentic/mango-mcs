@@ -52,6 +52,12 @@
 #   2026-02-03  Todd Valentic
 #               Add ability to reset the USB ports on start up
 #
+#   2026-06-12  Todd Valentic
+#               Add ability to delay restart on error and just
+#                   try taking another image at next schedule
+#                   point. If N failures in a row, restart camera.
+#                   Parameter: camera.retries
+#
 ###################################################################
 
 from NightDataMonitor import NightDataMonitorComponent
@@ -95,6 +101,7 @@ class CameraMonitor(NightDataMonitorComponent):
         bin_y = self.getint('camera.bin_y',1)
         set_point = self.getfloat('camera.set_point',-5)
         label = self.get('camera.label',self.name)
+        retries = self.getint('camera.retries', 0)
 
         diskFree = self.getBytes('require.diskFree','1MB')
         diskMount = self.get('require.diskMount','/')
@@ -110,6 +117,7 @@ class CameraMonitor(NightDataMonitorComponent):
             bin_x = schedule.getint('camera.bin_x',bin_x)
             bin_y = schedule.getint('camera.bin_y',bin_y)
             set_point = schedule.getint('camera.set_point',set_point)
+            retries = schedule.getint('camera.retries', retries)
             label = schedule.get('camera.label',label)
 
             diskFree = schedule.getBytes('require.diskFree',diskFree)
@@ -120,6 +128,7 @@ class CameraMonitor(NightDataMonitorComponent):
         self.exposure_time = exposure_time.total_seconds()
         self.warmup_time = warmup_time 
         self.cooldown_time = cooldown_time
+        self.retries = retries
 
         self.camera_config = dict(
             bin_x = bin_x, 
@@ -212,6 +221,7 @@ class CameraMonitor(NightDataMonitorComponent):
 
         self.camera_config = None
         self.prev_camera_config = None
+        self.retry_count = 0
 
         self.log.info('Connected to camera')
 
@@ -323,9 +333,16 @@ class CameraMonitor(NightDataMonitorComponent):
 
         try:
             image_data = self.camera.capture_image(self.exposure_time) 
+            self.retry_count = 0
         except:
             self.log.exception('Problem capturing image')
-            self.shutdown()
+            self.retry_count += 1
+            if self.retry_count <= self.retries:
+                sefl.log.info(
+                    "Retrying: %s of %s" % (self.retry_count, self.retries)
+                )
+            else:
+                self.shutdown()
             return None
 
         summary = '%.2fs / %.1fs / %.0fKB / %.1fC' % (
