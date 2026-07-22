@@ -1,0 +1,8 @@
+config BR2_PACKAGE_RPI_VCGENCMD
+	bool "rpi-vcgencmd"
+	depends on BR2_aarch64
+	help
+          Minimalist build of the Raspberry Pi vcgencmd utility
+          and required libraries for AArch64 systems. Based off
+          the rpi-userland package.
+
