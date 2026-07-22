@@ -32,8 +32,8 @@ cp -fa root/. /
 
 echo "Changing .tincan.net to .internal"
 
-sed -i 's/tincan.net/internal' /etc/hostname
-sed -i 's/tincan.net/internal' /etc/hosts
+sed -i 's/tincan.net/internal/' /etc/hostname
+sed -i 's/tincan.net/internal/' /etc/hosts
 
 echo "----------------------------------------------------------------"
 echo "Update finished"
