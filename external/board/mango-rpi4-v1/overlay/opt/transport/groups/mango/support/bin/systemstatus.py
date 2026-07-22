@@ -24,15 +24,29 @@
 #   2021-08-15  Todd Valentic
 #       Add temperature section
 #
+#   2026-07-21  Todd Valentic
+#       Add Board section with:
+#           RPi firmware version
+#           RPi bootloader version
+#           SBC info
+#       Add DataTransport section
+#       Add version of this program to [System]
+#
 ###########################################################
 
-from datetime       import datetime
+from datetime import datetime
 
+import calendar
+import ConfigParser
+import commands
+import glob
 import os
 import sys
 import StringIO
 import ConfigParser
 import glob
+
+VERSION = "1.1.0"
 
 class ResourceMonitor:
 
@@ -210,6 +224,119 @@ class ResourceMonitor:
             temp_c = float(temp_c)/1000
             stats.set(section, os.path.basename(zone), temp_c) 
 
+    def updateDataTransport(self, stats):
+
+        section = "DataTransport"
+        transport_dir = "/opt/transport"
+
+        cmd = "grep version %s/etc/transportd.conf" % transport_dir
+        status, output = commands.getstatusoutput(cmd)
+
+        stats.add_section(section)
+
+        if status == 0:
+            key, value = [v.strip() for v in output.split(":")]
+            stats.set(section, key, value)
+
+        for filename in glob.glob("%s/groups/**/release.conf" % transport_dir):
+            group = filename.replace(transport_dir+"/groups", "")
+            group = group.replace("release.conf", "")[1:-1]
+            config = ConfigParser.ConfigParser()
+            config.read(filename)
+
+            for key, value in config.defaults().items():
+                stats.set(section, "%s.%s" % (group, key), value)
+
+    def updateFirmwareVersion(self, stats):
+ 
+        cmd = "sudo /usr/bin/vcgencmd version"
+        status, output = commands.getstatusoutput(cmd)
+
+        if status != 0:
+            return
+
+        lines = output.split("\n")
+        info = {} 
+
+        for line in lines: 
+            line = line.strip()
+            try:
+                key, value = line.split()[:2]
+            except:
+                continue
+
+            info[key] = value
+
+        try:
+            fmt = "%b %d %Y %H:%M:%S"
+            tmtuple = datetime.strptime(lines[0].strip(), fmt).timetuple()
+            info["date"] = calendar.timegm(tmtuple)
+        except:
+            info["date"] = "" 
+
+        section = "Board"
+
+        if not stats.has_section(section):
+            stats.add_section(section)
+
+        stats.set(section, "firmware.version", info.get("version", ""))
+        stats.set(section, "firmware.date", info.get("date", ""))
+
+    def updateBootloaderVersion(self, stats):
+
+        cmd = "sudo /usr/bin/vcgencmd bootloader_version"
+        status, output = commands.getstatusoutput(cmd)
+
+        if status != 0:
+            return
+
+        info = {} 
+
+        for line in output.split("\n"):
+            try:
+                key, value = line.split()[:2]
+            except:
+                continue
+
+            info[key] = value
+
+        section = "Board"
+
+        if not stats.has_section(section):
+            stats.add_section(section)
+
+        stats.set(section, "bootloader.version", info.get("version", ""))
+        stats.set(section, "bootloader.timestamp", info.get("timestamp", ""))
+        stats.set(section, "bootloader.update-time", info.get("update-time", ""))
+        stats.set(section, "bootloader.capabilities", info.get("capabilities", ""))
+
+    def updateBoardInfo(self, stats):
+
+        info = {}
+
+        for line in open('/proc/cpuinfo').read().split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                key, value = line.split(":")
+                key = key.strip()
+            except:
+                continue
+
+            info[key] = value
+
+        section = "Board"
+
+        if not stats.has_section(section):
+            stats.add_section(section)
+
+        stats.set(section, "hardware", info.get("Hardware", ""))
+        stats.set(section, "revision", info.get("Revision", ""))
+        stats.set(section, "serial", info.get("Serial", ""))
+        stats.set(section, "model", info.get("Model", ""))
+
     def status(self):
 
         timestamp = datetime.now()
@@ -217,6 +344,7 @@ class ResourceMonitor:
         stats = ConfigParser.ConfigParser()
         stats.add_section('System')
         stats.set('System','timestamp',str(timestamp))
+        stats.set("System", "version", VERSION)
 
         self.updateMounts(stats)
         self.updateMemory(stats)
@@ -225,6 +353,12 @@ class ResourceMonitor:
         self.updateNetwork(stats)
         self.updateSwaps(stats)
         self.updateTemps(stats)
+        self.updateDataTransport(stats)
+        self.updateBoardInfo(stats)
+
+        if os.path.exists("/usr/bin/vcgencmd"):
+            self.updateBootloaderVersion(stats)
+            self.updateFirmwareVersion(stats)
 
         buffer = StringIO.StringIO()
         stats.write(buffer)
@@ -233,5 +367,5 @@ class ResourceMonitor:
 
 if __name__ == '__main__':
    monitor = ResourceMonitor(sys.argv)
-   print monitor.status()
+   print(monitor.status())
 
