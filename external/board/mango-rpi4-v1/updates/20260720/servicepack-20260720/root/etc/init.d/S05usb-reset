@@ -1,0 +1,21 @@
+#!/bin/sh
+case "$1" in
+    start)
+        # Check if the TP-Link adapter is trapped in storage mode
+        if lsusb | grep -q "2357:8151"; then
+            echo "Fixing TP-Link USB Ethernet boot state..."
+            # Force a hard electrical reset on the Pi 4 USB hub port
+            /usr/sbin/uhubctl -a cycle -l 1-1 >/dev/null 2>&1
+            # Allow the Linux USB subsystem a moment to register the true network ID
+            sleep 2 
+        fi
+        ;;
+    stop)
+        ;;
+    *)
+        echo "Usage: $0 {start|stop}"
+        exit 1
+        ;;
+esac
+exit 0
+

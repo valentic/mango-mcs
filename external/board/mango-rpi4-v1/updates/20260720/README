@@ -6,6 +6,8 @@ Online system update for mango-rpi4-v1
 
     - Add retries for camera monitor 
     - Add USB reset at boot for TP-Link adapters 
+    - Add vcgencmd and libraries
+    - Update systemstatus.py (1.1.0) to include board info
     - Release 1.26 
 
 
